@@ -15,6 +15,21 @@ export function daysBetween(date: string, now: Date): number {
   return Math.floor((parseDay(todayIso(now)).getTime() - parseDay(date).getTime()) / DAY_MS)
 }
 
+export function relativeDays(days: number): string {
+  if (days < 0) return 'à venir'
+  if (days === 0) return "aujourd'hui"
+  if (days === 1) return 'hier'
+  if (days < 30) return `il y a ${days} j`
+  if (days < 365) return `il y a ${Math.round(days / 30)} mois`
+  const years = Math.floor(days / 365)
+  return `il y a ${years} an${years > 1 ? 's' : ''}`
+}
+
+export function addDays(date: string, n: number): string {
+  const d = parseDay(date)
+  return todayIso(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n))
+}
+
 export function formatDay(date: string): string {
   return parseDay(date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
 }

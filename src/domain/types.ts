@@ -1,16 +1,17 @@
-export type Friend = { id: string; name: string }
+export type Friend = { id: string; name: string; avatarUrl?: string }
 
 export const ACTIVITIES = ['resto', 'cafe', 'sport', 'soiree', 'culture', 'voyage', 'autre'] as const
 export type Activity = (typeof ACTIVITIES)[number]
 
-export const ACTIVITY_META: Record<Activity, { label: string; emoji: string }> = {
-  resto: { label: 'Resto', emoji: '🍽️' },
-  cafe: { label: 'Café', emoji: '☕' },
-  sport: { label: 'Sport', emoji: '🏃' },
-  soiree: { label: 'Soirée', emoji: '🎉' },
-  culture: { label: 'Culture', emoji: '🎭' },
-  voyage: { label: 'Voyage', emoji: '✈️' },
-  autre: { label: 'Autre', emoji: '📌' },
+// Colors validated as a categorical set on the dark surface (#14141c); always paired with emoji + label.
+export const ACTIVITY_META: Record<Activity, { label: string; emoji: string; color: string }> = {
+  resto: { label: 'Resto', emoji: '🍽️', color: '#d95926' },
+  cafe: { label: 'Café', emoji: '☕', color: '#c98500' },
+  sport: { label: 'Sport', emoji: '🏃', color: '#008300' },
+  soiree: { label: 'Soirée', emoji: '🎉', color: '#d55181' },
+  culture: { label: 'Culture', emoji: '🎭', color: '#9085e9' },
+  voyage: { label: 'Voyage', emoji: '✈️', color: '#3987e5' },
+  autre: { label: 'Autre', emoji: '📌', color: '#199e70' },
 }
 
 export type Place = { label: string; lat: number; lng: number }

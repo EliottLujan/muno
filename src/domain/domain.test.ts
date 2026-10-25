@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { buildDemoData } from './demo'
 import { filterMeetings, groupByMonth } from './filters'
-import { countByActivity, friendStats, longestNotSeen } from './stats'
+import { relativeDays } from './dates'
+import { buildHeatmap, countByActivity, friendStats, longestNotSeen, summarize } from './stats'
 import { EMPTY_FILTERS, type Friend, type Meeting } from './types'
 
 const now = new Date('2026-10-25T12:00:00')
@@ -51,6 +52,40 @@ describe('groupByMonth', () => {
       ['2026-09', 1],
       ['2025-01', 1],
     ])
+  })
+})
+
+describe('relativeDays', () => {
+  it('formats durations in French', () => {
+    expect([0, 1, 5, 62, 400, 800].map(relativeDays)).toEqual([
+      "aujourd'hui",
+      'hier',
+      'il y a 5 j',
+      'il y a 2 mois',
+      'il y a 1 an',
+      'il y a 2 ans',
+    ])
+  })
+})
+
+describe('buildHeatmap', () => {
+  it('builds Monday-first weeks ending on the current week and counts meetings per day', () => {
+    const grid = buildHeatmap(meetings, now, 2)
+    expect(grid).toHaveLength(2)
+    expect(grid[0][0].date).toBe('2026-10-12')
+    expect(grid[1][6].date).toBe('2026-10-25')
+    expect(grid[1].find((c) => c.date === '2026-10-24')?.count).toBe(1)
+    expect(grid[1][6].future).toBe(false)
+  })
+})
+
+describe('summarize', () => {
+  it('computes headline numbers', () => {
+    const s = summarize(friends, meetings, now)
+    expect(s.total).toBe(4)
+    expect(s.last30Days).toBe(2)
+    expect(s.places).toBe(4)
+    expect(s.topFriend).toEqual({ friend: friends[1], count: 3 })
   })
 })
 

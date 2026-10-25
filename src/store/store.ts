@@ -10,11 +10,17 @@ export type State = Data & { filters: Filters }
 function load(): Data {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return parseData(raw)
+    if (raw) return withDemoAvatars(parseData(raw))
   } catch {
     // corrupted storage: start fresh rather than crash
   }
   return { friends: [], meetings: [] }
+}
+
+// Demo data saved before avatars existed gets its portraits back.
+function withDemoAvatars(data: Data): Data {
+  const demo = new Map(buildDemoData().friends.map((f) => [f.id, f.avatarUrl]))
+  return { ...data, friends: data.friends.map((f) => (f.avatarUrl || !demo.has(f.id) ? f : { ...f, avatarUrl: demo.get(f.id) })) }
 }
 
 export function parseData(raw: string): Data {

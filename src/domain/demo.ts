@@ -1,7 +1,22 @@
 import { todayIso } from './dates'
 import type { Activity, Friend, Meeting, Place } from './types'
 
-const FRIEND_NAMES = ['Léa', 'Tom', 'Max', 'Inès', 'Hugo', 'Camille', 'Nora', 'Julien', 'Sarah', 'Karim', 'Chloé', 'Antoine', 'Paul']
+// [name, randomuser.me portrait path]
+const DEMO_FRIENDS: [string, string][] = [
+  ['Léa', 'women/44'],
+  ['Tom', 'men/32'],
+  ['Max', 'men/75'],
+  ['Inès', 'women/68'],
+  ['Hugo', 'men/46'],
+  ['Camille', 'women/12'],
+  ['Nora', 'women/90'],
+  ['Julien', 'men/22'],
+  ['Sarah', 'women/29'],
+  ['Karim', 'men/85'],
+  ['Chloé', 'women/57'],
+  ['Antoine', 'men/61'],
+  ['Paul', 'men/8'],
+]
 
 const PLACES: { place: Place; activity: Activity }[] = [
   { place: { label: 'Bouillon Chartier, Paris 9e', lat: 48.8719, lng: 2.3437 }, activity: 'resto' },
@@ -66,7 +81,11 @@ const MEETINGS: [number, number[], number, string?][] = [
 ]
 
 export function buildDemoData(now = new Date()): { friends: Friend[]; meetings: Meeting[] } {
-  const friends = FRIEND_NAMES.map((name, i) => ({ id: `demo-friend-${i}`, name }))
+  const friends = DEMO_FRIENDS.map(([name, portrait], i) => ({
+    id: `demo-friend-${i}`,
+    name,
+    avatarUrl: `https://randomuser.me/api/portraits/${portrait}.jpg`,
+  }))
   const meetings = MEETINGS.map(([daysAgo, friendIdx, placeIdx, note], i) => {
     const { place, activity } = PLACES[placeIdx]
     return {

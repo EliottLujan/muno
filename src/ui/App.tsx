@@ -1,6 +1,9 @@
 import { useState } from 'react'
+import { ChartColumn, Clock3, Map as MapIcon, Plus, Settings2, Users } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { Activity as ActivityType, Meeting } from '../domain/types'
 import { actions } from '../store/store'
+import { glass } from './components'
 import { MeetingForm } from './MeetingForm'
 import { Settings } from './Settings'
 import { Activity } from './tabs/Activity'
@@ -10,82 +13,135 @@ import { Timeline } from './tabs/Timeline'
 
 type Tab = 'timeline' | 'map' | 'friends' | 'activity'
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'timeline', label: 'Timeline', icon: '🕒' },
-  { id: 'map', label: 'Carte', icon: '🗺️' },
-  { id: 'friends', label: 'Amis', icon: '👥' },
-  { id: 'activity', label: 'Activité', icon: '📊' },
+const TABS: { id: Tab; label: string; Icon: LucideIcon }[] = [
+  { id: 'timeline', label: 'Timeline', Icon: Clock3 },
+  { id: 'map', label: 'Carte', Icon: MapIcon },
+  { id: 'friends', label: 'Amis', Icon: Users },
+  { id: 'activity', label: 'Activité', Icon: ChartColumn },
 ]
 
-type Editing = { meeting?: Meeting } | null
+function Logo() {
+  return (
+    <span className="flex items-center gap-2.5">
+      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-600 via-violet-600 to-orange-500 text-xl shadow-lg shadow-fuchsia-900/50">
+        🖕
+      </span>
+      <span className="font-display text-2xl font-extrabold tracking-tight">Nuno</span>
+    </span>
+  )
+}
+
+function TabButton({ tab, active, onClick }: { tab: (typeof TABS)[number]; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={`flex flex-1 flex-col items-center gap-1 py-2 text-[11px] font-medium transition md:flex-none md:flex-row md:gap-3 md:rounded-2xl md:px-4 md:py-3 md:text-[15px] ${
+        active ? 'text-white md:bg-white/10' : 'text-white/45 hover:text-white/80'
+      }`}
+    >
+      <tab.Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
+      {tab.label}
+    </button>
+  )
+}
 
 export function App() {
   const [tab, setTab] = useState<Tab>('timeline')
-  const [editing, setEditing] = useState<Editing>(null)
+  const [editing, setEditing] = useState<{ meeting?: Meeting } | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const open = (meeting: Meeting) => setEditing({ meeting })
   const add = () => setEditing({})
 
+  function go(next: Tab) {
+    setTab(next)
+    document.getElementById('main')?.scrollTo({ top: 0 })
+  }
+
   function showFriend(friendId: string) {
     actions.setFilters({ friendId, activity: null, text: '', period: 'all' })
-    setTab('timeline')
+    go('timeline')
   }
 
   function showActivity(activity: ActivityType) {
     actions.setFilters({ activity, friendId: null, text: '', period: 'all' })
-    setTab('timeline')
+    go('timeline')
   }
 
+  const settingsButton = (
+    <button
+      type="button"
+      onClick={() => setSettingsOpen(true)}
+      aria-label="Réglages"
+      className={`flex h-10 w-10 items-center justify-center rounded-full text-white/70 hover:text-white ${glass}`}
+    >
+      <Settings2 size={18} />
+    </button>
+  )
+
   return (
-    <div className="flex h-full flex-col md:flex-row">
-      <nav className="order-last flex border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:order-first md:w-56 md:flex-col md:border-r md:border-t-0 md:p-4">
-        <div className="hidden items-center gap-2 px-2 pb-6 text-2xl font-black md:flex">🖕 Nuno</div>
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            aria-current={tab === t.id ? 'page' : undefined}
-            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-xs md:flex-none md:flex-row md:gap-3 md:rounded-xl md:px-3 md:py-2.5 md:text-base ${
-              tab === t.id ? 'font-semibold text-indigo-600 md:bg-indigo-50' : 'text-slate-500'
-            }`}
-          >
-            <span className="text-xl md:text-lg">{t.icon}</span>
-            {t.label}
-          </button>
-        ))}
-      </nav>
+    <div className="relative flex h-full">
+      <div className="aurora" />
+      <div className="grain" />
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        <header className="flex items-center justify-between px-4 py-3 md:hidden">
-          <span className="text-xl font-black">🖕 Nuno</span>
-          <button type="button" onClick={() => setSettingsOpen(true)} aria-label="Réglages" className="text-xl">
-            ⚙️
-          </button>
-        </header>
-        <header className="hidden items-center justify-end px-6 pt-4 md:flex">
-          <button type="button" onClick={() => setSettingsOpen(true)} className="text-sm text-slate-500">
-            ⚙️ Réglages
-          </button>
-        </header>
+      <aside className="relative z-10 hidden w-64 shrink-0 flex-col gap-8 p-6 md:flex">
+        <Logo />
+        <nav className="flex flex-col gap-1">
+          {TABS.map((t) => (
+            <TabButton key={t.id} tab={t} active={tab === t.id} onClick={() => go(t.id)} />
+          ))}
+        </nav>
+        <button
+          type="button"
+          onClick={add}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-orange-500 py-3 font-semibold shadow-lg shadow-fuchsia-900/40"
+        >
+          <Plus size={18} /> Nouveau moment
+        </button>
+        <div className="mt-auto">{settingsButton}</div>
+      </aside>
 
-        <main className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto px-4 pb-24 pt-2 md:px-6 md:pb-8">
-          {tab === 'timeline' && <Timeline onOpen={open} onAdd={add} />}
-          {tab === 'map' && <MapView onOpen={open} />}
-          {tab === 'friends' && <Friends onShowFriend={showFriend} />}
-          {tab === 'activity' && <Activity onShowActivity={showActivity} onShowFriend={showFriend} />}
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+        {tab !== 'map' && (
+          <header className="flex items-center justify-between px-4 pb-1 pt-[calc(env(safe-area-inset-top)+12px)] md:hidden">
+            <Logo />
+            {settingsButton}
+          </header>
+        )}
+
+        <main
+          id="main"
+          className={`flex-1 overflow-y-auto ${tab === 'map' ? 'md:p-6' : 'px-4 pb-32 pt-2 md:px-10 md:pb-12 md:pt-8'}`}
+        >
+          <div className={tab === 'map' ? 'h-full' : 'mx-auto w-full max-w-2xl'}>
+            {tab === 'timeline' && <Timeline onOpen={open} onAdd={add} />}
+            {tab === 'map' && <MapView onOpen={open} />}
+            {tab === 'friends' && <Friends onShowFriend={showFriend} />}
+            {tab === 'activity' && <Activity onShowActivity={showActivity} onShowFriend={showFriend} />}
+          </div>
         </main>
       </div>
 
-      <button
-        type="button"
-        onClick={add}
-        aria-label="Nouveau rendez-vous"
-        className="fixed bottom-20 right-5 z-[900] h-14 w-14 rounded-full bg-indigo-600 text-3xl text-white shadow-lg md:bottom-8 md:right-8"
+      <nav
+        className={`fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+12px)] z-[900] flex items-center rounded-[28px] bg-night/70 px-2 shadow-2xl shadow-black/50 ring-1 ring-white/10 backdrop-blur-2xl md:hidden`}
       >
-        +
-      </button>
+        {TABS.slice(0, 2).map((t) => (
+          <TabButton key={t.id} tab={t} active={tab === t.id} onClick={() => go(t.id)} />
+        ))}
+        <button
+          type="button"
+          onClick={add}
+          aria-label="Nouveau moment"
+          className="-mt-8 mx-1 flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-600 via-violet-600 to-orange-500 shadow-xl shadow-fuchsia-900/60 ring-[6px] ring-night transition active:scale-95"
+        >
+          <Plus size={30} strokeWidth={2.5} />
+        </button>
+        {TABS.slice(2).map((t) => (
+          <TabButton key={t.id} tab={t} active={tab === t.id} onClick={() => go(t.id)} />
+        ))}
+      </nav>
 
       {editing && <MeetingForm meeting={editing.meeting} onClose={() => setEditing(null)} />}
       {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}

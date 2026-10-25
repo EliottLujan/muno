@@ -1,7 +1,10 @@
 import { useState, type ChangeEvent } from 'react'
+import { Download, Sparkles, Upload } from 'lucide-react'
 import { todayIso } from '../domain/dates'
 import { actions } from '../store/store'
 import { Modal } from './components'
+
+const row = 'flex w-full items-center gap-3 rounded-2xl bg-white/[0.05] px-4 py-3.5 text-left font-medium ring-1 ring-white/10 hover:bg-white/10'
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
@@ -27,29 +30,27 @@ export function Settings({ onClose }: { onClose: () => void }) {
     }
   }
 
+  function loadDemo() {
+    if (!confirm('Remplacer toutes les données actuelles par les exemples ?')) return
+    actions.loadDemo()
+    setMessage({ ok: true, text: 'Exemples chargés.' })
+  }
+
   return (
     <Modal title="Réglages" onClose={onClose}>
       <div className="space-y-3">
-        <p className="text-sm text-slate-500">Les données sont stockées uniquement dans ce navigateur. Exporte-les pour les sauvegarder.</p>
-        <button type="button" onClick={exportData} className="w-full rounded-xl bg-indigo-600 py-2.5 font-semibold text-white">
-          Exporter (JSON)
+        <p className="text-sm text-white/50">Tout reste dans ce navigateur. Exporte de temps en temps pour ne rien perdre.</p>
+        <button type="button" onClick={exportData} className={row}>
+          <Download size={18} className="text-white/50" /> Exporter mes données
         </button>
-        <label className="block w-full cursor-pointer rounded-xl bg-slate-100 py-2.5 text-center font-semibold">
-          Importer un fichier JSON
+        <label className={`cursor-pointer ${row}`}>
+          <Upload size={18} className="text-white/50" /> Importer un fichier JSON
           <input type="file" accept="application/json,.json" onChange={importData} className="hidden" />
         </label>
-        <button
-          type="button"
-          onClick={() => {
-            if (!confirm('Remplacer toutes les données actuelles par les exemples ?')) return
-            actions.loadDemo()
-            setMessage({ ok: true, text: 'Exemples chargés.' })
-          }}
-          className="w-full rounded-xl py-2.5 text-sm text-indigo-600 underline"
-        >
-          Charger des exemples
+        <button type="button" onClick={loadDemo} className={row}>
+          <Sparkles size={18} className="text-fuchsia-300" /> Charger des exemples
         </button>
-        {message && <p className={`text-sm ${message.ok ? 'text-emerald-600' : 'text-rose-600'}`}>{message.text}</p>}
+        {message && <p className={`text-sm ${message.ok ? 'text-emerald-300' : 'text-rose-300'}`}>{message.text}</p>}
       </div>
     </Modal>
   )
