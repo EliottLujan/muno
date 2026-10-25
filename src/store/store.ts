@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { buildDemoData } from '../domain/demo'
 import { EMPTY_FILTERS, type Filters, type Friend, type Meeting } from '../domain/types'
 
 const STORAGE_KEY = 'nuno:v1'
@@ -72,5 +73,8 @@ export const actions = {
   },
   importData(raw: string) {
     set(parseData(raw))
+  },
+  loadDemo() {
+    set({ ...buildDemoData(), filters: EMPTY_FILTERS })
   },
 }

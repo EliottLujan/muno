@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { buildDemoData } from './demo'
 import { filterMeetings, groupByMonth } from './filters'
 import { countByActivity, friendStats, longestNotSeen } from './stats'
 import { EMPTY_FILTERS, type Friend, type Meeting } from './types'
@@ -50,6 +51,15 @@ describe('groupByMonth', () => {
       ['2026-09', 1],
       ['2025-01', 1],
     ])
+  })
+})
+
+describe('buildDemoData', () => {
+  it('only references existing friends and dates relative to now', () => {
+    const demo = buildDemoData(now)
+    const ids = new Set(demo.friends.map((f) => f.id))
+    expect(demo.meetings.every((m) => m.friendIds.length > 0 && m.friendIds.every((id) => ids.has(id)))).toBe(true)
+    expect(demo.meetings[0].date).toBe('2026-10-24')
   })
 })
 

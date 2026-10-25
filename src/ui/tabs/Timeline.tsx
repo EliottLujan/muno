@@ -1,7 +1,7 @@
 import { formatMonth } from '../../domain/dates'
 import { filterMeetings, groupByMonth } from '../../domain/filters'
 import type { Meeting } from '../../domain/types'
-import { useStore } from '../../store/store'
+import { actions, useStore } from '../../store/store'
 import { FiltersBar, MeetingCard } from '../components'
 
 export function Timeline({ onOpen, onAdd }: { onOpen: (m: Meeting) => void; onAdd: () => void }) {
@@ -16,6 +16,9 @@ export function Timeline({ onOpen, onAdd }: { onOpen: (m: Meeting) => void; onAd
         <p className="text-slate-600">Aucun rendez-vous pour l'instant.</p>
         <button type="button" onClick={onAdd} className="rounded-xl bg-indigo-600 px-5 py-2.5 font-semibold text-white">
           Ajouter mon premier RDV
+        </button>
+        <button type="button" onClick={actions.loadDemo} className="text-sm text-indigo-600 underline">
+          Charger des exemples
         </button>
       </div>
     )

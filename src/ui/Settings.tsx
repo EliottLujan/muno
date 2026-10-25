@@ -38,6 +38,17 @@ export function Settings({ onClose }: { onClose: () => void }) {
           Importer un fichier JSON
           <input type="file" accept="application/json,.json" onChange={importData} className="hidden" />
         </label>
+        <button
+          type="button"
+          onClick={() => {
+            if (!confirm('Remplacer toutes les données actuelles par les exemples ?')) return
+            actions.loadDemo()
+            setMessage({ ok: true, text: 'Exemples chargés.' })
+          }}
+          className="w-full rounded-xl py-2.5 text-sm text-indigo-600 underline"
+        >
+          Charger des exemples
+        </button>
         {message && <p className={`text-sm ${message.ok ? 'text-emerald-600' : 'text-rose-600'}`}>{message.text}</p>}
       </div>
     </Modal>
