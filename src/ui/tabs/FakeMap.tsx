@@ -169,7 +169,7 @@ export function FakeMap({ meetings, friends, onOpen }: { meetings: Meeting[]; fr
         const r = e.currentTarget.getBoundingClientRect()
         animateTo(zoomAt(viewRef.current, 2.2, e.clientX - r.left, e.clientY - r.top, r.width, r.height))
       }}
-      className="relative h-[64dvh] min-h-[420px] cursor-grab touch-none select-none overflow-hidden rounded-[32px] ring-1 ring-white/10 active:cursor-grabbing md:h-[620px]"
+      className="relative h-full min-h-[300px] cursor-grab touch-none select-none overflow-hidden rounded-[28px] ring-1 ring-white/10 active:cursor-grabbing"
       style={{
         background:
           'radial-gradient(120% 90% at 30% 20%, #1a1530 0%, #0d0d18 55%, #08080f 100%), radial-gradient(circle, #ffffff10 1px, transparent 1.2px) 0 0 / 18px 18px',

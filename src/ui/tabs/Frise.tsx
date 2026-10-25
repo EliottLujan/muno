@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react'
 import { daysBetween, parseDay, relativeDays } from '../../domain/dates'
 import { layoutFrise, type FriseNode } from '../../domain/frise'
@@ -72,17 +72,18 @@ function MonthTicker({ register }: { register: (set: (key: string) => void) => v
   useLayoutEffect(() => {
     register(setKey)
   }, [register])
-  if (!key) return <span className="flex-1" />
-  const date = parseDay(`${key}-01`)
+  const date = key ? parseDay(`${key}-01`) : null
   return (
-    <span className="relative flex-1 overflow-hidden">
-      <span key={key} className="frise-ticker flex items-baseline gap-2 whitespace-nowrap">
-        <span className="font-display text-2xl font-extrabold capitalize leading-none tracking-tight md:text-3xl">
-          {date.toLocaleDateString('fr-FR', { month: 'long' })}
+    <div className="pointer-events-none flex h-12 items-center justify-center overflow-hidden md:h-16" aria-live="polite">
+      {date && (
+        <span key={key} className="frise-ticker flex items-baseline gap-2.5 whitespace-nowrap">
+          <span className="font-display text-[34px] font-extrabold capitalize leading-none tracking-tight md:text-[54px]">
+            {date.toLocaleDateString('fr-FR', { month: 'long' })}
+          </span>
+          <span className="text-gradient font-display text-2xl font-extrabold leading-none md:text-4xl">{date.getFullYear()}</span>
         </span>
-        <span className="font-display text-lg font-bold leading-none text-white/30 md:text-xl">{date.getFullYear()}</span>
-      </span>
-    </span>
+      )}
+    </div>
   )
 }
 
@@ -94,6 +95,10 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
   const setMonth = useRef<(key: string) => void>(() => {})
   const engine = useRef({ target: 0, raf: 0, running: false })
   const interacted = useRef(false)
+  const hinted = useRef(false)
+  const [zoom, setZoom] = useState(1)
+  const zoomRef = useRef(1)
+  const keep = useRef<{ ratio: number; atEnd: boolean } | null>(null)
   const drag = useRef<{ x: number; left: number; moved: boolean; lastX: number; lastT: number; v: number } | null>(null)
   const [reduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
 
@@ -152,6 +157,33 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
     if (el) el.scrollLeft = el.scrollWidth
   }, [signature])
 
+  // Fit the frise to the available height: the page itself never scrolls vertically.
+  useLayoutEffect(() => {
+    const el = scroller.current
+    if (!el) return
+    const measure = () => {
+      const next = Math.round(clamp(el.clientHeight / H, 0.5, 1.35) * 100) / 100
+      if (next === zoomRef.current) return
+      const max = el.scrollWidth - el.clientWidth
+      keep.current = { ratio: (el.scrollLeft + el.clientWidth / 2) / Math.max(1, el.scrollWidth), atEnd: el.scrollLeft >= max - 2 }
+      zoomRef.current = next
+      setZoom(next)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  useLayoutEffect(() => {
+    const el = scroller.current
+    const k = keep.current
+    if (!el || !k) return
+    keep.current = null
+    stopEngine()
+    el.scrollLeft = k.atEnd ? el.scrollWidth : k.ratio * el.scrollWidth - el.clientWidth / 2
+  }, [zoom])
+
   useEffect(() => {
     const el = scroller.current
     const box = inner.current
@@ -172,13 +204,13 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
     let active = -1
     let month = ''
     const apply = (left: number, v: number) => {
-      const w = el.clientWidth
-      const center = left + w / 2
+      const w = el.clientWidth / zoom
+      const center = left / zoom + w / 2
       const half = w / 2 + 80
       box.style.setProperty('--v', clamp(v / 2.5, -1, 1).toFixed(3))
       box.style.setProperty('--av', Math.min(1, Math.abs(v) / 2.5).toFixed(3))
-      box.style.setProperty('--sx', left.toFixed(1))
-      box.style.setProperty('--cw', String(w))
+      box.style.setProperty('--sx', (left / zoom).toFixed(1))
+      box.style.setProperty('--cw', w.toFixed(1))
 
       let best = -1
       let bestDist = Infinity
@@ -235,21 +267,19 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
       interacted.current = true
       if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return stopEngine()
       const unit = e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? el.clientWidth : 1
-      const delta = -e.deltaY * unit * 1.3
-      const from = base()
-      const max = el.scrollWidth - el.clientWidth
-      if ((delta < 0 && from <= 0) || (delta > 0 && from >= max - 1)) return
       e.preventDefault()
-      scrollTo(from + delta)
+      scrollTo(base() - e.deltaY * unit * 1.3)
     }
     el.addEventListener('wheel', wheel, { passive: false })
 
-    const hints = interacted.current || reduced
-      ? []
-      : [
+    const hints =
+      interacted.current || reduced || hinted.current
+        ? []
+        : [
           window.setTimeout(() => !interacted.current && scrollTo(el.scrollWidth - el.clientWidth - 220), 1400),
           window.setTimeout(() => !interacted.current && scrollTo(el.scrollWidth), 2100),
         ]
+    hinted.current = true
 
     return () => {
       observer.disconnect()
@@ -261,7 +291,7 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
       window.removeEventListener('resize', onResize)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature, layout])
+  }, [signature, layout, zoom])
 
   const page = (dir: -1 | 1) => {
     interacted.current = true
@@ -278,38 +308,20 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
   }
 
   const cometDur = Math.max(8, layout.width / 260)
+  const registerMonth = useCallback((set: (key: string) => void) => {
+    setMonth.current = set
+  }, [])
+  const roundBtn = `flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/70 transition hover:scale-110 hover:text-white active:scale-95 ${glass}`
 
   return (
-    <div className="relative -mx-4 md:mx-0">
-      <div className="mb-1 flex items-center gap-2 px-4 md:px-0">
-        <MonthTicker register={(set) => (setMonth.current = set)} />
-        <button type="button" aria-label="Plus ancien" onClick={() => page(-1)} className={`flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:scale-110 hover:text-white active:scale-95 ${glass}`}>
-          <ChevronLeft size={18} />
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            interacted.current = true
-            scrollTo(Infinity)
-          }}
-          className={`flex h-9 items-center gap-2 rounded-full px-3.5 text-xs font-bold uppercase tracking-widest text-white/80 transition hover:text-white active:scale-95 ${glass}`}
-        >
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inset-0 animate-ping rounded-full bg-fuchsia-400" />
-            <span className="relative h-2 w-2 rounded-full bg-fuchsia-400" />
-          </span>
-          <span className="hidden sm:inline">Maintenant</span>
-        </button>
-        <button type="button" aria-label="Plus récent" onClick={() => page(1)} className={`flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:scale-110 hover:text-white active:scale-95 ${glass}`}>
-          <ChevronRight size={18} />
-        </button>
-      </div>
+    <div className="flex h-full flex-col">
+      <MonthTicker register={registerMonth} />
 
       <div
         ref={scroller}
         tabIndex={0}
         aria-label="Frise chronologique, flèches gauche et droite pour naviguer"
-        className="frise-scroller no-scrollbar cursor-grab overflow-x-auto overflow-y-hidden outline-none active:cursor-grabbing"
+        className="frise-scroller no-scrollbar flex min-h-0 flex-1 cursor-grab items-center overflow-x-auto overflow-y-hidden outline-none active:cursor-grabbing"
         onKeyDown={(e) => {
           const el = e.currentTarget
           const moves: Record<string, number> = { ArrowLeft: -320, ArrowRight: 320, PageUp: -el.clientWidth, PageDown: el.clientWidth }
@@ -350,7 +362,7 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
           }
         }}
       >
-        <div key={signature} ref={inner} className="relative select-none" style={{ width: layout.width, height: H }}>
+        <div key={signature} ref={inner} className="relative shrink-0 select-none" style={{ width: layout.width, height: H, zoom }}>
           {years.map((n) => (
             <span
               key={n.meeting.id}
@@ -489,8 +501,12 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
         </div>
       </div>
 
+      <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-3">
+        <button type="button" aria-label="Plus ancien" onClick={() => page(-1)} className={roundBtn}>
+          <ChevronLeft size={18} />
+        </button>
       <div
-        className="relative mx-4 mt-2 h-9 cursor-pointer touch-none md:mx-0"
+        className="relative h-10 min-w-0 flex-1 cursor-pointer touch-none"
         role="presentation"
         onPointerDown={(e) => {
           interacted.current = true
@@ -513,6 +529,25 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
           </span>
         ))}
         <div ref={miniWindow} className="frise-mini-window absolute inset-y-0 rounded-xl bg-white/[0.07] ring-1 ring-white/40 backdrop-blur-[1px]" />
+      </div>
+        <button type="button" aria-label="Plus récent" onClick={() => page(1)} className={roundBtn}>
+          <ChevronRight size={18} />
+        </button>
+        <button
+          type="button"
+          aria-label="Revenir à maintenant"
+          onClick={() => {
+            interacted.current = true
+            scrollTo(Infinity)
+          }}
+          className={`flex h-10 shrink-0 items-center gap-2 rounded-full px-3.5 text-xs font-bold uppercase tracking-widest text-white/80 transition hover:text-white active:scale-95 ${glass}`}
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inset-0 animate-ping rounded-full bg-fuchsia-400" />
+            <span className="relative h-2 w-2 rounded-full bg-fuchsia-400" />
+          </span>
+          <span className="hidden sm:inline">Maintenant</span>
+        </button>
       </div>
     </div>
   )
