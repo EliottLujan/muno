@@ -581,7 +581,7 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
         </div>
       </div>
 
-      <div className="flex justify-center px-3">
+      <div className="flex translate-y-2 justify-center px-3 md:translate-y-10">
         <button
           type="button"
           aria-label="Revenir à maintenant"
