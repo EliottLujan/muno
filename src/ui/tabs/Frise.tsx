@@ -17,6 +17,7 @@ const CARD_W = 260
 const PAD = 180
 
 const nodeY = (n: FriseNode, i: number) => MID + (n.up ? -1 : 1) * AMPS[i % AMPS.length]
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
 
 function buildPath(points: { x: number; y: number }[]): string {
   return points.reduce((d, p, i) => {
@@ -25,11 +26,6 @@ function buildPath(points: { x: number; y: number }[]): string {
     const dx = (p.x - prev.x) / 2
     return `${d} C${prev.x + dx},${prev.y} ${p.x - dx},${p.y} ${p.x},${p.y}`
   }, '')
-}
-
-function useReducedMotion() {
-  const [reduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-  return reduced
 }
 
 function FriseCard({ meeting, friends, onOpen }: { meeting: Meeting; friends: Friend[]; onOpen: () => void }) {
@@ -70,18 +66,86 @@ function FriseCard({ meeting, friends, onOpen }: { meeting: Meeting; friends: Fr
   )
 }
 
+/** Own state so the month ticker can change without re-rendering the whole frise. */
+function MonthTicker({ register }: { register: (set: (key: string) => void) => void }) {
+  const [key, setKey] = useState('')
+  useLayoutEffect(() => {
+    register(setKey)
+  }, [register])
+  if (!key) return <span className="flex-1" />
+  const date = parseDay(`${key}-01`)
+  return (
+    <span className="relative flex-1 overflow-hidden">
+      <span key={key} className="frise-ticker flex items-baseline gap-2 whitespace-nowrap">
+        <span className="font-display text-2xl font-extrabold capitalize leading-none tracking-tight md:text-3xl">
+          {date.toLocaleDateString('fr-FR', { month: 'long' })}
+        </span>
+        <span className="font-display text-lg font-bold leading-none text-white/30 md:text-xl">{date.getFullYear()}</span>
+      </span>
+    </span>
+  )
+}
+
 export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; friends: Friend[]; onOpen: (m: Meeting) => void }) {
   const scroller = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ x: number; left: number; moved: boolean } | null>(null)
-  const reduced = useReducedMotion()
-  const [active, setActive] = useState(-1)
+  const inner = useRef<HTMLDivElement>(null)
+  const miniWindow = useRef<HTMLDivElement>(null)
+  const entries = useRef<(HTMLDivElement | null)[]>([])
+  const setMonth = useRef<(key: string) => void>(() => {})
+  const engine = useRef({ target: 0, raf: 0, running: false })
+  const interacted = useRef(false)
+  const drag = useRef<{ x: number; left: number; moved: boolean; lastX: number; lastT: number; v: number } | null>(null)
+  const [reduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
 
   const byId = useMemo(() => new Map(friends.map((f) => [f.id, f])), [friends])
   const layout = useMemo(() => layoutFrise(meetings, { pad: PAD }), [meetings])
   const signature = layout.nodes.map((n) => n.meeting.id).join()
-  const points = layout.nodes.map((n, i) => ({ x: n.x, y: nodeY(n, i) }))
-  const d = buildPath([{ x: 0, y: MID }, ...points, { x: layout.width, y: MID }])
+  const d = useMemo(
+    () => buildPath([{ x: 0, y: MID }, ...layout.nodes.map((n, i) => ({ x: n.x, y: nodeY(n, i) })), { x: layout.width, y: MID }]),
+    [layout],
+  )
+  const years = useMemo(
+    () => layout.nodes.filter((n, i) => i === 0 || n.meeting.date.slice(0, 4) !== layout.nodes[i - 1].meeting.date.slice(0, 4)),
+    [layout],
+  )
   const now = new Date()
+
+  const stopEngine = () => {
+    cancelAnimationFrame(engine.current.raf)
+    engine.current.running = false
+  }
+
+  const scrollTo = (target: number, instant = false) => {
+    const el = scroller.current
+    if (!el) return
+    const e = engine.current
+    e.target = clamp(target, 0, el.scrollWidth - el.clientWidth)
+    if (reduced || instant) {
+      stopEngine()
+      el.scrollLeft = e.target
+      return
+    }
+    if (e.running) return
+    e.running = true
+    const step = () => {
+      const cur = el.scrollLeft
+      const diff = e.target - cur
+      if (Math.abs(diff) < 1) {
+        el.scrollLeft = e.target
+        e.running = false
+        return
+      }
+      el.scrollLeft = cur + Math.sign(diff) * Math.max(1, Math.abs(diff) * 0.11)
+      if (el.scrollLeft === cur) {
+        e.running = false
+        return
+      }
+      e.raf = requestAnimationFrame(step)
+    }
+    e.raf = requestAnimationFrame(step)
+  }
+
+  const base = () => (engine.current.running ? engine.current.target : (scroller.current?.scrollLeft ?? 0))
 
   useLayoutEffect(() => {
     const el = scroller.current
@@ -90,97 +154,194 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
 
   useEffect(() => {
     const el = scroller.current
-    if (!el) return
+    const box = inner.current
+    if (!el || !box) return
+
     const observer = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((e) => {
+      (list) =>
+        list.forEach((e) => {
           if (!e.isIntersecting) return
           e.target.parentElement?.setAttribute('data-in', '')
           observer.unobserve(e.target)
         }),
-      { root: el, rootMargin: '0px -6% 0px -6%', threshold: 0.15 },
+      { root: el, rootMargin: '0px 2% 0px 2%', threshold: 0.1 },
     )
     el.querySelectorAll('.frise-slot').forEach((n) => observer.observe(n))
 
-    let frame = 0
-    const track = () => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => {
-        const center = el.scrollLeft + el.clientWidth / 2
-        let best = -1
-        let bestDist = Infinity
-        layout.nodes.forEach((n, i) => {
-          const dist = Math.abs(n.x - center)
-          if (dist < bestDist) [best, bestDist] = [i, dist]
-        })
-        setActive(bestDist < 140 ? best : -1)
+    const lastP = new Float32Array(layout.nodes.length).fill(NaN)
+    let active = -1
+    let month = ''
+    const apply = (left: number, v: number) => {
+      const w = el.clientWidth
+      const center = left + w / 2
+      const half = w / 2 + 80
+      box.style.setProperty('--v', clamp(v / 2.5, -1, 1).toFixed(3))
+      box.style.setProperty('--av', Math.min(1, Math.abs(v) / 2.5).toFixed(3))
+      box.style.setProperty('--sx', left.toFixed(1))
+      box.style.setProperty('--cw', String(w))
+
+      let best = -1
+      let bestDist = Infinity
+      layout.nodes.forEach((n, i) => {
+        const dist = n.x - center
+        if (Math.abs(dist) < bestDist) [best, bestDist] = [i, Math.abs(dist)]
+        const p = Math.round(clamp(dist / half, -1.4, 1.4) * 200) / 200
+        if (p === lastP[i]) return
+        lastP[i] = p
+        const node = entries.current[i]
+        node?.style.setProperty('--p', String(p))
+        node?.style.setProperty('--ap', String(Math.abs(p)))
       })
+      const nextActive = bestDist < 140 ? best : -1
+      if (nextActive !== active) {
+        if (active >= 0) entries.current[active]?.removeAttribute('data-active')
+        if (nextActive >= 0) entries.current[nextActive]?.setAttribute('data-active', '')
+        active = nextActive
+      }
+      const nextMonth = best >= 0 ? layout.nodes[best].meeting.date.slice(0, 7) : ''
+      if (nextMonth !== month) setMonth.current((month = nextMonth))
+
+      const win = miniWindow.current
+      if (win && el.scrollWidth > 0) {
+        win.style.left = `${(left / el.scrollWidth) * 100}%`
+        win.style.width = `${(w / el.scrollWidth) * 100}%`
+      }
     }
-    track()
-    el.addEventListener('scroll', track, { passive: true })
+
+    const fx = { raf: 0, last: el.scrollLeft, lastT: 0, v: 0, idle: 0 }
+    const frame = (t: number) => {
+      const left = el.scrollLeft
+      const inst = (left - fx.last) / Math.max(1, t - fx.lastT)
+      fx.v += (inst - fx.v) * 0.18
+      fx.idle = left === fx.last ? fx.idle + 1 : 0
+      fx.last = left
+      fx.lastT = t
+      if (fx.idle > 2 && Math.abs(fx.v) < 0.01) fx.v = 0
+      apply(left, fx.v)
+      fx.raf = fx.v === 0 && fx.idle > 2 ? 0 : requestAnimationFrame(frame)
+    }
+    const kick = () => {
+      if (fx.raf) return
+      fx.last = el.scrollLeft
+      fx.lastT = performance.now()
+      fx.raf = requestAnimationFrame(frame)
+    }
+    apply(el.scrollLeft, 0)
+    el.addEventListener('scroll', kick, { passive: true })
+    const onResize = () => apply(el.scrollLeft, 0)
+    window.addEventListener('resize', onResize)
 
     const wheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
-      const atStart = el.scrollLeft <= 0 && e.deltaY < 0
-      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1 && e.deltaY > 0
-      if (atStart || atEnd) return
+      interacted.current = true
+      if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return stopEngine()
+      const unit = e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? el.clientWidth : 1
+      const delta = -e.deltaY * unit * 1.3
+      const from = base()
+      const max = el.scrollWidth - el.clientWidth
+      if ((delta < 0 && from <= 0) || (delta > 0 && from >= max - 1)) return
       e.preventDefault()
-      el.scrollLeft += e.deltaY
+      scrollTo(from + delta)
     }
     el.addEventListener('wheel', wheel, { passive: false })
 
+    const hints = interacted.current || reduced
+      ? []
+      : [
+          window.setTimeout(() => !interacted.current && scrollTo(el.scrollWidth - el.clientWidth - 220), 1400),
+          window.setTimeout(() => !interacted.current && scrollTo(el.scrollWidth), 2100),
+        ]
+
     return () => {
       observer.disconnect()
-      cancelAnimationFrame(frame)
-      el.removeEventListener('scroll', track)
+      cancelAnimationFrame(fx.raf)
+      stopEngine()
+      hints.forEach(clearTimeout)
+      el.removeEventListener('scroll', kick)
       el.removeEventListener('wheel', wheel)
+      window.removeEventListener('resize', onResize)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, layout])
 
-  const scrollByPage = (dir: -1 | 1) => {
+  const page = (dir: -1 | 1) => {
+    interacted.current = true
     const el = scroller.current
-    el?.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: reduced ? 'auto' : 'smooth' })
-  }
-  const toNow = () => {
-    const el = scroller.current
-    el?.scrollTo({ left: el.scrollWidth, behavior: reduced ? 'auto' : 'smooth' })
+    if (el) scrollTo(base() + dir * el.clientWidth * 0.8)
   }
 
-  const cometDur = `${Math.max(8, layout.width / 260)}s`
+  const fromMini = (clientX: number, instant: boolean) => {
+    const el = scroller.current
+    const bar = miniWindow.current?.parentElement
+    if (!el || !bar) return
+    const r = bar.getBoundingClientRect()
+    scrollTo(((clientX - r.left) / r.width) * el.scrollWidth - el.clientWidth / 2, instant)
+  }
+
+  const cometDur = Math.max(8, layout.width / 260)
 
   return (
     <div className="relative -mx-4 md:mx-0">
-      <div className="mb-1 flex items-center justify-end gap-2 px-4 md:px-0">
-        <button type="button" aria-label="Plus ancien" onClick={() => scrollByPage(-1)} className={`flex h-9 w-9 items-center justify-center rounded-full text-white/70 hover:text-white ${glass}`}>
+      <div className="mb-1 flex items-center gap-2 px-4 md:px-0">
+        <MonthTicker register={(set) => (setMonth.current = set)} />
+        <button type="button" aria-label="Plus ancien" onClick={() => page(-1)} className={`flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:scale-110 hover:text-white active:scale-95 ${glass}`}>
           <ChevronLeft size={18} />
         </button>
-        <button type="button" onClick={toNow} className={`flex h-9 items-center gap-2 rounded-full px-3.5 text-xs font-bold uppercase tracking-widest text-white/80 hover:text-white ${glass}`}>
+        <button
+          type="button"
+          onClick={() => {
+            interacted.current = true
+            scrollTo(Infinity)
+          }}
+          className={`flex h-9 items-center gap-2 rounded-full px-3.5 text-xs font-bold uppercase tracking-widest text-white/80 transition hover:text-white active:scale-95 ${glass}`}
+        >
           <span className="relative flex h-2 w-2">
             <span className="absolute inset-0 animate-ping rounded-full bg-fuchsia-400" />
             <span className="relative h-2 w-2 rounded-full bg-fuchsia-400" />
           </span>
-          Maintenant
+          <span className="hidden sm:inline">Maintenant</span>
         </button>
-        <button type="button" aria-label="Plus récent" onClick={() => scrollByPage(1)} className={`flex h-9 w-9 items-center justify-center rounded-full text-white/70 hover:text-white ${glass}`}>
+        <button type="button" aria-label="Plus récent" onClick={() => page(1)} className={`flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition hover:scale-110 hover:text-white active:scale-95 ${glass}`}>
           <ChevronRight size={18} />
         </button>
       </div>
 
       <div
         ref={scroller}
-        className="frise-scroller no-scrollbar cursor-grab overflow-x-auto overflow-y-hidden active:cursor-grabbing"
+        tabIndex={0}
+        aria-label="Frise chronologique, flèches gauche et droite pour naviguer"
+        className="frise-scroller no-scrollbar cursor-grab overflow-x-auto overflow-y-hidden outline-none active:cursor-grabbing"
+        onKeyDown={(e) => {
+          const el = e.currentTarget
+          const moves: Record<string, number> = { ArrowLeft: -320, ArrowRight: 320, PageUp: -el.clientWidth, PageDown: el.clientWidth }
+          if (e.key === 'Home') scrollTo(0)
+          else if (e.key === 'End') scrollTo(Infinity)
+          else if (e.key in moves) scrollTo(base() + moves[e.key])
+          else return
+          interacted.current = true
+          e.preventDefault()
+        }}
         onPointerDown={(e) => {
+          interacted.current = true
+          stopEngine()
           if (e.pointerType !== 'mouse') return
-          drag.current = { x: e.clientX, left: e.currentTarget.scrollLeft, moved: false }
+          drag.current = { x: e.clientX, left: e.currentTarget.scrollLeft, moved: false, lastX: e.clientX, lastT: e.timeStamp, v: 0 }
         }}
         onPointerMove={(e) => {
           const s = drag.current
           if (!s) return
           const dx = e.clientX - s.x
           if (Math.abs(dx) > 5) s.moved = true
+          const dt = Math.max(1, e.timeStamp - s.lastT)
+          s.v = s.v * 0.6 + ((e.clientX - s.lastX) / dt) * 0.4
+          s.lastX = e.clientX
+          s.lastT = e.timeStamp
           e.currentTarget.scrollLeft = s.left - dx
         }}
-        onPointerUp={() => setTimeout(() => (drag.current = null))}
+        onPointerUp={(e) => {
+          const s = drag.current
+          if (s?.moved && e.timeStamp - s.lastT < 80) scrollTo(e.currentTarget.scrollLeft - s.v * 320)
+          setTimeout(() => (drag.current = null))
+        }}
         onPointerLeave={() => (drag.current = null)}
         onClickCapture={(e) => {
           if (drag.current?.moved) {
@@ -189,7 +350,18 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
           }
         }}
       >
-        <div key={signature} className="relative select-none" style={{ width: layout.width, height: H }}>
+        <div key={signature} ref={inner} className="relative select-none" style={{ width: layout.width, height: H }}>
+          {years.map((n) => (
+            <span
+              key={n.meeting.id}
+              aria-hidden
+              className="frise-year pointer-events-none absolute font-display font-extrabold leading-none text-white/[0.045]"
+              style={{ left: n.x - 40, top: MID - 90, '--x': n.x } as CSSProperties}
+            >
+              {n.meeting.date.slice(0, 4)}
+            </span>
+          ))}
+
           <svg className="absolute inset-0" width={layout.width} height={H} aria-hidden>
             <defs>
               <linearGradient id="frise-grad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={layout.width} y2="0">
@@ -215,7 +387,7 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
 
             <path d={d} fill="none" stroke="white" strokeOpacity="0.08" strokeWidth="10" strokeLinecap="round" />
             <path d={d} fill="none" stroke="white" strokeOpacity="0.25" strokeWidth="2" strokeDasharray="1 11" strokeLinecap="round" className="frise-flow" />
-            <path d={d} pathLength={1} fill="none" stroke="url(#frise-grad)" strokeWidth="12" strokeOpacity="0.55" filter="url(#frise-glow)" className="frise-draw" />
+            <path d={d} pathLength={1} fill="none" stroke="url(#frise-grad)" strokeOpacity="0.55" filter="url(#frise-glow)" className="frise-draw frise-glow" />
             <path d={d} pathLength={1} fill="none" stroke="url(#frise-grad)" strokeWidth="4" strokeLinecap="round" className="frise-draw" />
 
             {layout.nodes.map((n, i) => {
@@ -237,19 +409,11 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
             })}
 
             {!reduced &&
-              [0, 0.33, 0.66].map((offset) => (
+              [0, 0.25, 0.5, 0.75].map((offset) => (
                 <g key={offset}>
                   <circle r="14" fill="url(#frise-comet)" opacity="0.7" className="frise-comet-halo" />
                   <circle r="3.5" fill="#fff" />
-                  <animateMotion
-                    dur={cometDur}
-                    begin={`-${offset * parseFloat(cometDur)}s`}
-                    repeatCount="indefinite"
-                    path={d}
-                    keyPoints="1;0"
-                    keyTimes="0;1"
-                    calcMode="linear"
-                  />
+                  <animateMotion dur={`${cometDur}s`} begin={`-${offset * cometDur}s`} repeatCount="indefinite" path={d} keyPoints="1;0" keyTimes="0;1" calcMode="linear" />
                 </g>
               ))}
           </svg>
@@ -290,8 +454,10 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
             return (
               <div
                 key={n.meeting.id}
+                ref={(el) => {
+                  entries.current[i] = el
+                }}
                 data-up={n.up ? '' : undefined}
-                data-active={i === active ? '' : undefined}
                 className="frise-entry"
                 style={{ '--frise-delay': `${(i % 4) * 70}ms` } as CSSProperties}
               >
@@ -309,16 +475,44 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
                   className="frise-slot absolute"
                   style={{ left: n.x - CARD_W / 2, width: CARD_W, maxHeight: CARD, ...(n.up ? { bottom: H - (y - edge) } : { top: y + edge }) }}
                 >
-                  <FriseCard
-                    meeting={n.meeting}
-                    friends={n.meeting.friendIds.map((id) => byId.get(id)).filter((f): f is Friend => !!f)}
-                    onOpen={() => onOpen(n.meeting)}
-                  />
+                  <div className="frise-tilt">
+                    <FriseCard
+                      meeting={n.meeting}
+                      friends={n.meeting.friendIds.map((id) => byId.get(id)).filter((f): f is Friend => !!f)}
+                      onOpen={() => onOpen(n.meeting)}
+                    />
+                  </div>
                 </div>
               </div>
             )
           })}
         </div>
+      </div>
+
+      <div
+        className="relative mx-4 mt-2 h-9 cursor-pointer touch-none md:mx-0"
+        role="presentation"
+        onPointerDown={(e) => {
+          interacted.current = true
+          e.currentTarget.setPointerCapture(e.pointerId)
+          fromMini(e.clientX, false)
+        }}
+        onPointerMove={(e) => e.currentTarget.hasPointerCapture(e.pointerId) && fromMini(e.clientX, true)}
+      >
+        <span className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-fuchsia-500/30 via-white/15 to-orange-400/30" />
+        {layout.nodes.map((n, i) => (
+          <span
+            key={n.meeting.id}
+            className="absolute h-1.5 w-1.5 -translate-x-1/2 rounded-full"
+            style={{ left: `${(n.x / layout.width) * 100}%`, top: `calc(50% ${n.up ? '-' : '+'} ${AMPS[i % AMPS.length] / 8}px - 3px)`, background: ACTIVITY_META[n.meeting.activity].color }}
+          />
+        ))}
+        {years.map((n) => (
+          <span key={n.meeting.id} className="absolute bottom-0 -translate-x-1/2 text-[9px] font-bold text-white/35" style={{ left: `${(n.x / layout.width) * 100}%` }}>
+            {n.meeting.date.slice(0, 4)}
+          </span>
+        ))}
+        <div ref={miniWindow} className="frise-mini-window absolute inset-y-0 rounded-xl bg-white/[0.07] ring-1 ring-white/40 backdrop-blur-[1px]" />
       </div>
     </div>
   )

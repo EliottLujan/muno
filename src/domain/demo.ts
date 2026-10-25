@@ -16,6 +16,13 @@ const DEMO_FRIENDS: [string, string][] = [
   ['Chloé', 'women/57'],
   ['Antoine', 'men/61'],
   ['Paul', 'men/8'],
+  ['Lucas', 'men/11'],
+  ['Emma', 'women/21'],
+  ['Yanis', 'men/53'],
+  ['Margaux', 'women/33'],
+  ['Théo', 'men/39'],
+  ['Jade', 'women/79'],
+  ['Bastien', 'men/14'],
 ]
 
 const PLACES: { place: Place; activity: Activity }[] = [
@@ -37,7 +44,74 @@ const PLACES: { place: Place; activity: Activity }[] = [
   { place: { label: "Lac d'Annecy, Annecy", lat: 45.8992, lng: 6.1294 }, activity: 'voyage' },
   { place: { label: 'Grande Plage, Biarritz', lat: 43.4844, lng: -1.5586 }, activity: 'voyage' },
   { place: { label: 'Canal Saint-Martin, Paris 10e', lat: 48.8708, lng: 2.3655 }, activity: 'autre' },
+  { place: { label: 'Le Train Bleu, Paris 12e', lat: 48.8447, lng: 2.3735 }, activity: 'resto' },
+  { place: { label: 'Shakespeare and Company, Paris 5e', lat: 48.8526, lng: 2.3471 }, activity: 'culture' },
+  { place: { label: 'Rosa Bonheur, Paris 19e', lat: 48.8786, lng: 2.3836 }, activity: 'soiree' },
+  { place: { label: 'Piscine Joséphine Baker, Paris 13e', lat: 48.8365, lng: 2.3757 }, activity: 'sport' },
+  { place: { label: 'Fondation Louis Vuitton, Paris 16e', lat: 48.8766, lng: 2.2633 }, activity: 'culture' },
+  { place: { label: 'Marché des Enfants Rouges, Paris 3e', lat: 48.8629, lng: 2.3618 }, activity: 'resto' },
+  { place: { label: 'Coutume Café, Paris 7e', lat: 48.8513, lng: 2.3166 }, activity: 'cafe' },
+  { place: { label: 'Le Baron Rouge, Paris 12e', lat: 48.8495, lng: 2.3784 }, activity: 'soiree' },
+  { place: { label: 'Vieux-Lille, Lille', lat: 50.6403, lng: 3.0632 }, activity: 'voyage' },
+  { place: { label: 'Île de Nantes, Nantes', lat: 47.2066, lng: -1.5636 }, activity: 'voyage' },
+  { place: { label: 'Petite France, Strasbourg', lat: 48.5803, lng: 7.7408 }, activity: 'voyage' },
+  { place: { label: 'Promenade des Anglais, Nice', lat: 43.6953, lng: 7.2656 }, activity: 'voyage' },
+  { place: { label: 'Place du Capitole, Toulouse', lat: 43.6045, lng: 1.444 }, activity: 'voyage' },
+  { place: { label: 'Intra-muros, Saint-Malo', lat: 48.6493, lng: -2.0257 }, activity: 'voyage' },
+  { place: { label: 'Calanque de Sormiou, Marseille', lat: 43.2096, lng: 5.4187 }, activity: 'sport' },
+  { place: { label: 'Citadelle, Ajaccio', lat: 41.9192, lng: 8.7386 }, activity: 'voyage' },
+  { place: { label: 'Mer de Glace, Chamonix', lat: 45.9237, lng: 6.8694 }, activity: 'sport' },
+  { place: { label: "L'Écusson, Montpellier", lat: 43.6109, lng: 3.8772 }, activity: 'voyage' },
+  { place: { label: 'Falaises, Étretat', lat: 49.7077, lng: 0.2036 }, activity: 'voyage' },
+  { place: { label: 'Chez Léa, Paris 11e', lat: 48.859, lng: 2.379 }, activity: 'autre' },
+  { place: { label: 'La coloc de Tom, Montreuil', lat: 48.8638, lng: 2.4485 }, activity: 'autre' },
 ]
+
+const CITY_PLACES = PLACES.flatMap((p, i) => (p.activity !== 'voyage' && i !== 32 && i !== 34 ? [i] : []))
+const TRIP_PLACES = PLACES.flatMap((p, i) => (p.activity === 'voyage' || i === 32 || i === 34 ? [i] : []))
+
+const NOTES: Record<Activity, string[]> = {
+  resto: ['Meilleur tiramisu de Paris', 'On a refait le monde', 'Brunch qui a duré 4 h', "Il a enfin payé l'addition 😅", 'Nouvelle adresse à retenir'],
+  cafe: ['Café rapide avant le boulot', 'Débrief de son entretien', 'Cookies incroyables', "Elle m'a annoncé sa grossesse 🍼"],
+  sport: ['Footing 10 km', 'Foot du dimanche', 'Escalade, bras en compote', 'Yoga au soleil', 'Padel, perdu 6-2'],
+  soiree: ["Karaoké jusqu'à 3 h 🎤", 'Soirée jeux de société', 'Anniversaire surprise 🎉', 'Blind test légendaire'],
+  culture: ['Expo photo géniale', 'Ciné : on a pleuré', 'Pièce de théâtre', 'Concert électro'],
+  voyage: ['Week-end improvisé', 'Coucher de soleil dingue 🌅', 'Road trip en van 🚐', 'Fruits de mer au port'],
+  autre: ['Aidé à déménager 📦', "Apéro au bord de l'eau", 'Dîner à la maison', 'Garde du chat 🐈'],
+}
+
+// Closest friends show up more often.
+const FRIEND_WEIGHTS = [9, 9, 7, 6, 6, 5, 4, 4, 4, 3, 3, 2, 2, 3, 3, 2, 2, 2, 1, 1]
+
+function mulberry32(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function generated(): [number, number[], number, string?][] {
+  const rand = mulberry32(42)
+  const pick = <T,>(list: T[]) => list[Math.floor(rand() * list.length)]
+  const total = FRIEND_WEIGHTS.reduce((a, b) => a + b, 0)
+  const weightedFriend = () => {
+    let r = rand() * total
+    return FRIEND_WEIGHTS.findIndex((w) => (r -= w) < 0)
+  }
+  const out: [number, number[], number, string?][] = []
+  for (let day = 2 + Math.floor(rand() * 3); day < 900; day += 1 + Math.floor(rand() * 8)) {
+    const trip = rand() < 0.14
+    const placeIdx = pick(trip ? TRIP_PLACES : CITY_PLACES)
+    const size = trip ? 2 + Math.floor(rand() * 3) : rand() < 0.45 ? 1 : 2 + Math.floor(rand() * 2)
+    const friends = new Set<number>()
+    while (friends.size < size) friends.add(weightedFriend())
+    const note = rand() < 0.4 ? pick(NOTES[PLACES[placeIdx].activity]) : undefined
+    out.push([day, [...friends], placeIdx, note])
+  }
+  return out
+}
 
 // [daysAgo, friend indexes, place index, note]
 const MEETINGS: [number, number[], number, string?][] = [
@@ -86,7 +160,7 @@ export function buildDemoData(now = new Date()): { friends: Friend[]; meetings: 
     name,
     avatarUrl: `https://randomuser.me/api/portraits/${portrait}.jpg`,
   }))
-  const meetings = MEETINGS.map(([daysAgo, friendIdx, placeIdx, note], i) => {
+  const meetings = [...MEETINGS, ...generated()].map(([daysAgo, friendIdx, placeIdx, note], i) => {
     const { place, activity } = PLACES[placeIdx]
     return {
       id: `demo-meeting-${i}`,

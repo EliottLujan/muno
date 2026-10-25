@@ -10,11 +10,20 @@ export type State = Data & { filters: Filters }
 function load(): Data {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return withDemoAvatars(parseData(raw))
+    if (raw) return withDemoAvatars(refreshDemo(parseData(raw)))
   } catch {
     // corrupted storage: start fresh rather than crash
   }
   return { friends: [], meetings: [] }
+}
+
+// Untouched demo data is regenerated so it follows the current demo set.
+function refreshDemo(data: Data): Data {
+  const pureDemo =
+    data.meetings.length > 0 &&
+    data.friends.every((f) => f.id.startsWith('demo-friend-')) &&
+    data.meetings.every((m) => m.id.startsWith('demo-meeting-'))
+  return pureDemo ? buildDemoData() : data
 }
 
 // Demo data saved before avatars existed gets its portraits back.

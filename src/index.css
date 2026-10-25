@@ -160,6 +160,44 @@ body {
 .frise-card {
   transition: background-color 0.3s;
 }
+/* Scroll-driven: --p is the card's offset from the viewport centre (-1..1), --v the scroll velocity. */
+.frise-tilt {
+  --lift: 16px;
+  transform-origin: 50% 0%;
+  transform: perspective(900px) rotateY(calc(var(--p, 0) * -24deg)) translateY(calc(var(--ap, 0) * var(--lift)))
+    scale(calc(1 - var(--ap, 0) * 0.12)) skewX(calc(var(--v, 0) * -7deg));
+  opacity: calc(1 - var(--ap, 0) * 0.4);
+}
+.frise-entry[data-up] .frise-tilt {
+  --lift: -16px;
+  transform-origin: 50% 100%;
+}
+.frise-entry[data-in] .frise-node {
+  scale: calc(1 - var(--ap, 0) * 0.3);
+}
+.frise-glow {
+  stroke-width: calc(14px + var(--av, 0) * 16px);
+  transition: stroke-width 0.3s ease-out;
+}
+.frise-year {
+  font-size: 180px;
+  letter-spacing: -0.04em;
+  transform: translateX(calc((var(--sx, 0) + var(--cw, 0) / 2 - var(--x, 0)) * 0.35px));
+}
+.frise-ticker {
+  animation: frise-ticker 0.45s cubic-bezier(0.2, 1.2, 0.3, 1) both;
+}
+@keyframes frise-ticker {
+  from {
+    opacity: 0;
+    transform: translateY(70%);
+    filter: blur(4px);
+  }
+}
+.frise-mini-window {
+  box-shadow: 0 0 24px -4px #c026d3aa;
+  transition: box-shadow 0.2s;
+}
 
 /* Calendar */
 .calendar-cell {
@@ -198,5 +236,13 @@ body {
   }
   .frise-draw {
     stroke-dasharray: none;
+  }
+  .frise-tilt,
+  .frise-year {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+  .frise-entry .frise-node {
+    scale: none !important;
   }
 }

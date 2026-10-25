@@ -171,3 +171,13 @@ describe('layoutFrise', () => {
     expect(width).toBe(nodes[3].x + 10)
   })
 })
+
+describe('buildDemoData volume', () => {
+  it('is large, deterministic and uses unique ids', () => {
+    const a = buildDemoData(now)
+    const b = buildDemoData(now)
+    expect(a.meetings.length).toBeGreaterThan(150)
+    expect(new Set(a.meetings.map((m) => m.id)).size).toBe(a.meetings.length)
+    expect(a.meetings.map((m) => m.date)).toEqual(b.meetings.map((m) => m.date))
+  })
+})
