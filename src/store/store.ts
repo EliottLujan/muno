@@ -14,7 +14,8 @@ function load(): Data {
   } catch {
     // corrupted storage: start fresh rather than crash
   }
-  return { friends: [], meetings: [] }
+  // First visit: show the demo so the app isn't empty. Clearing data later is persisted, so it stays empty.
+  return buildDemoData()
 }
 
 // Untouched demo data is regenerated so it follows the current demo set.
