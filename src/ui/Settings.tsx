@@ -13,7 +13,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
     const blob = new Blob([actions.exportData()], { type: 'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `nuno-${todayIso()}.json`
+    a.download = `muno-${todayIso()}.json`
     a.click()
     URL.revokeObjectURL(a.href)
   }

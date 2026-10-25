@@ -121,13 +121,13 @@ export function Timeline({ onOpen, onAdd }: { onOpen: (m: Meeting) => void; onAd
       <div className="flex min-h-[70vh] animate-rise flex-col items-center justify-center gap-6 text-center">
         <div className="relative">
           <div className="absolute inset-0 rounded-full bg-fuchsia-600 opacity-50 blur-3xl" />
-          <span className="relative block text-8xl">🖕</span>
+          <span className="relative block font-display text-9xl font-extrabold text-gradient">M</span>
         </div>
         <div className="space-y-2">
           <h1 className="font-display text-4xl font-extrabold tracking-tight">
             Rien. <span className="text-gradient">Nada.</span>
           </h1>
-          <p className="max-w-xs text-white/60">Note qui tu vois, quand et où. Nuno se souvient pour toi.</p>
+          <p className="max-w-xs text-white/60">Note qui tu vois, quand et où. Muno se souvient pour toi.</p>
         </div>
         <div className="flex flex-col gap-3">
           <button

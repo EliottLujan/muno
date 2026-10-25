@@ -23,10 +23,10 @@ const TABS: { id: Tab; label: string; Icon: LucideIcon }[] = [
 function Logo() {
   return (
     <span className="flex items-center gap-2.5">
-      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-600 via-violet-600 to-orange-500 text-xl shadow-lg shadow-fuchsia-900/50">
-        🖕
+      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-600 via-violet-600 to-orange-500 font-display text-2xl font-extrabold shadow-lg shadow-fuchsia-900/50">
+        M
       </span>
-      <span className="font-display text-2xl font-extrabold tracking-tight">Nuno</span>
+      <span className="font-display text-2xl font-extrabold tracking-tight">Muno</span>
     </span>
   )
 }

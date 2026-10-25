@@ -25,7 +25,7 @@ function markerIcon(activity: Activity, recent: boolean) {
     icons.set(
       key,
       divIcon({
-        className: 'nuno-marker',
+        className: 'muno-marker',
         iconSize: [40, 40],
         iconAnchor: [20, 20],
         popupAnchor: [0, -18],
