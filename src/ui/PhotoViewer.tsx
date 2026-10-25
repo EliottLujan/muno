@@ -32,18 +32,21 @@ export function PhotoViewer({ photos, start = 0, caption, onClose }: { photos: s
       aria-modal="true"
       aria-label="Souvenirs"
       className="fixed inset-0 z-[1100] flex animate-fade flex-col items-center justify-center gap-4 bg-black/90 p-4 backdrop-blur-xl"
-      onClick={onClose}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (e.target === e.currentTarget) onClose()
+      }}
       onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
       onTouchEnd={(e) => {
         const dx = e.changedTouches[0].clientX - touchX.current
         if (many && Math.abs(dx) > 50) go(dx < 0 ? 1 : -1)
       }}
     >
-      <button type="button" aria-label="Fermer" onClick={onClose} className="absolute right-4 top-[calc(env(safe-area-inset-top)+16px)] flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/20">
+      <button type="button" aria-label="Fermer" onClick={onClose} className="absolute right-4 top-[calc(env(safe-area-inset-top)+16px)] z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/20">
         <X size={20} />
       </button>
 
-      <div className="relative flex min-h-0 w-full flex-1 items-center justify-center" onClick={(e) => e.stopPropagation()}>
+      <div className="relative flex min-h-0 w-full flex-1 items-center justify-center" onClick={(e) => e.target === e.currentTarget && onClose()}>
         <img
           key={index}
           src={photos[index]}
@@ -64,7 +67,7 @@ export function PhotoViewer({ photos, start = 0, caption, onClose }: { photos: s
         )}
       </div>
 
-      <div className="flex flex-col items-center gap-3 pb-[env(safe-area-inset-bottom)]" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-col items-center gap-3 pb-[env(safe-area-inset-bottom)]">
         {caption && <p className="text-center text-sm font-medium text-white/70">{caption}</p>}
         {many && (
           <div className="flex gap-2">
