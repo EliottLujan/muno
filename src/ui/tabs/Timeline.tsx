@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { MapPin, Sparkles } from 'lucide-react'
 import { daysBetween, parseDay, relativeDays } from '../../domain/dates'
 import { filterMeetings, groupByMonth } from '../../domain/filters'
@@ -5,6 +6,7 @@ import { summarize } from '../../domain/stats'
 import { ACTIVITY_META, type Friend, type Meeting } from '../../domain/types'
 import { actions, useStore } from '../../store/store'
 import { ActivityPill, ActivityTile, AvatarStack, FiltersBar, StatTile, glass } from '../components'
+import { Trail } from './Trail'
 
 function MonthHeader({ monthKey, count }: { monthKey: string; count: number }) {
   const d = parseDay(`${monthKey}-01`)
@@ -25,24 +27,32 @@ function TimelineEntry({ meeting, friends, index, onOpen }: { meeting: Meeting; 
   const d = parseDay(meeting.date)
   const ago = daysBetween(meeting.date, new Date())
   const names = friends.map((f) => f.name)
+  const left = index % 2 === 0
+  const tilt = (left ? 1 : -1) * (0.5 + (index % 3) * 0.35)
 
   return (
-    <li className="relative flex animate-rise gap-3 md:gap-5" style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}>
-      <div className="flex w-12 shrink-0 flex-col items-center pt-3 md:w-14">
-        <span className="font-display text-3xl font-extrabold leading-none tracking-tight">{d.getDate()}</span>
-        <span className="mt-1 text-[11px] font-semibold uppercase tracking-widest text-white/40">
+    <li
+      data-trail-entry
+      data-trail-color={meta.color}
+      className={`trail-entry relative ${left ? 'pl-14 md:pl-20' : 'pr-14 md:pr-20'}`}
+      style={{ '--trail-from': left ? '36px' : '-36px', '--trail-tilt': `${tilt}deg` } as CSSProperties}
+    >
+      <span
+        data-trail-node
+        className={`trail-node absolute top-1 flex h-12 w-12 flex-col items-center justify-center rounded-full bg-night ${left ? 'left-1 md:left-4' : 'right-1 md:right-4'}`}
+        style={{ boxShadow: `0 0 0 2px ${meta.color}, 0 0 28px -2px ${meta.color}` }}
+      >
+        {ago <= 7 && <span className="absolute inset-0 animate-ping rounded-full opacity-40" style={{ background: meta.color }} />}
+        <span className="relative font-display text-lg font-extrabold leading-none">{d.getDate()}</span>
+        <span className="relative text-[9px] font-bold uppercase tracking-wider text-white/50">
           {d.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '')}
         </span>
-        <span className="relative mt-3 flex h-3 w-3">
-          {ago <= 7 && <span className="absolute inset-0 animate-ping rounded-full opacity-60" style={{ background: meta.color }} />}
-          <span className="relative h-3 w-3 rounded-full ring-4 ring-night" style={{ background: meta.color, boxShadow: `0 0 16px ${meta.color}` }} />
-        </span>
-      </div>
+      </span>
 
       <button
         type="button"
         onClick={onOpen}
-        className={`group relative mb-4 flex min-w-0 flex-1 gap-4 overflow-hidden rounded-3xl p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:bg-white/[0.07] md:p-5 ${glass}`}
+        className={`trail-card group relative flex w-full min-w-0 gap-4 overflow-hidden rounded-[28px] p-4 text-left hover:bg-white/[0.07] md:p-5 ${glass}`}
       >
         <span
           aria-hidden
@@ -156,26 +166,42 @@ export function Timeline({ onOpen, onAdd }: { onOpen: (m: Meeting) => void; onAd
           Aucun moment ne correspond.
         </div>
       )}
-      {groups.map((g) => (
-        <section key={g.key}>
-          <MonthHeader monthKey={g.key} count={g.meetings.length} />
-          <ol className="relative pt-2">
-            <span
-              aria-hidden
-              className="absolute bottom-4 left-6 top-4 w-px bg-gradient-to-b from-white/25 via-white/10 to-transparent md:left-7"
-            />
-            {g.meetings.map((m) => (
-              <TimelineEntry
-                key={m.id}
-                meeting={m}
-                index={index++}
-                friends={m.friendIds.map((id) => byId.get(id)).filter((f): f is Friend => !!f)}
-                onOpen={() => onOpen(m)}
-              />
-            ))}
-          </ol>
-        </section>
-      ))}
+      {groups.length > 0 && (
+        <Trail signature={groups.map((g) => g.meetings.map((m) => m.id).join()).join('|')}>
+          <div
+            data-trail-start
+            className="relative mx-auto mb-4 flex w-fit items-center gap-2 rounded-full bg-white/[0.06] px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white/70 ring-1 ring-white/10 backdrop-blur-xl"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inset-0 animate-ping rounded-full bg-fuchsia-400" />
+              <span className="relative h-2 w-2 rounded-full bg-fuchsia-400" />
+            </span>
+            Maintenant
+          </div>
+          {groups.map((g) => (
+            <section key={g.key} className="pb-6">
+              <MonthHeader monthKey={g.key} count={g.meetings.length} />
+              <ol className="flex flex-col gap-12 pt-6">
+                {g.meetings.map((m) => (
+                  <TimelineEntry
+                    key={m.id}
+                    meeting={m}
+                    index={index++}
+                    friends={m.friendIds.map((id) => byId.get(id)).filter((f): f is Friend => !!f)}
+                    onOpen={() => onOpen(m)}
+                  />
+                ))}
+              </ol>
+            </section>
+          ))}
+          <div
+            data-trail-end
+            className="relative mx-auto mt-10 w-fit rounded-full bg-gradient-to-r from-fuchsia-600/30 to-orange-500/30 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-white/80 ring-1 ring-white/15 backdrop-blur-xl"
+          >
+            ✨ Le début de l'histoire
+          </div>
+        </Trail>
+      )}
     </div>
   )
 }

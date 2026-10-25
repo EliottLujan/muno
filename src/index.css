@@ -128,10 +128,57 @@ body {
   border: none;
 }
 
+.trail-card {
+  opacity: 0;
+  transform: translateX(var(--trail-from)) rotate(calc(var(--trail-tilt) * 4)) scale(0.92);
+  transition:
+    opacity 0.6s ease var(--trail-delay, 0ms),
+    transform 0.8s cubic-bezier(0.2, 1.3, 0.3, 1) var(--trail-delay, 0ms),
+    background-color 0.3s;
+}
+.trail-entry[data-trail-in] .trail-card {
+  opacity: 1;
+  transform: rotate(var(--trail-tilt));
+}
+.trail-entry[data-trail-in] .trail-card:hover {
+  transform: rotate(0deg) translateY(-4px) scale(1.015);
+}
+.trail-node {
+  transform: scale(0) rotate(-90deg);
+  transition: transform 0.6s cubic-bezier(0.3, 1.7, 0.5, 1) calc(var(--trail-delay, 0ms) + 120ms);
+}
+.trail-entry[data-trail-in] .trail-node {
+  transform: none;
+}
+.trail-flow {
+  animation: trail-flow 2s linear infinite;
+}
+@keyframes trail-flow {
+  to {
+    stroke-dashoffset: -23;
+  }
+}
+.trail-comet-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: trail-pulse 1.6s ease-in-out infinite;
+}
+@keyframes trail-pulse {
+  50% {
+    transform: scale(1.35);
+    opacity: 0.6;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   .aurora {
     animation: none !important;
     transition: none !important;
+  }
+  .trail-card,
+  .trail-entry .trail-node {
+    opacity: 1;
+    transform: none;
   }
 }
