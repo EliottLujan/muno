@@ -31,7 +31,7 @@ function initials(name: string): string {
     .toUpperCase()
 }
 
-const AVATAR_SIZES = { sm: 'h-7 w-7 text-[11px]', md: 'h-10 w-10 text-sm', lg: 'h-14 w-14 text-lg', xl: 'h-20 w-20 text-2xl' }
+const AVATAR_SIZES = { xs: 'h-5 w-5 text-[8px]', sm: 'h-7 w-7 text-[11px]', md: 'h-10 w-10 text-sm', lg: 'h-14 w-14 text-lg', xl: 'h-20 w-20 text-2xl' }
 
 export function Avatar({ friend, size = 'md', className = '' }: { friend: Friend; size?: keyof typeof AVATAR_SIZES; className?: string }) {
   const [broken, setBroken] = useState(false)

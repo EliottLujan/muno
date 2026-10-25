@@ -3,7 +3,7 @@ import { Minus, Plus, Scan, X } from 'lucide-react'
 import { formatDay } from '../../domain/dates'
 import { boundsOf, clusterGroups, groupByPlace, project, type Point } from '../../domain/geo'
 import { ACTIVITY_META, type Friend, type Meeting } from '../../domain/types'
-import { AvatarStack, glass } from '../components'
+import { Avatar, AvatarStack, glass } from '../components'
 import { CITIES, GRATICULE, LAND, PARKS, PERIPH, RIVER_PATHS } from './fakeMapShapes'
 
 type View = { cx: number; cy: number; s: number }
@@ -12,6 +12,10 @@ const MIN_S = 0.2
 const MAX_S = 1500
 const FRANCE_CENTER = project(46.6, 2.4)
 const FRANCE_VIEW: View = { cx: FRANCE_CENTER.x, cy: FRANCE_CENTER.y, s: 0.35 }
+/** Screen box (px) a photo preview needs above its pin; previews that would collide are skipped. */
+const PREVIEW_W = 92
+const PREVIEW_H = 120
+const MAX_PREVIEWS = 10
 const SCALES_KM = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500]
 
 const clampS = (s: number) => Math.min(MAX_S, Math.max(MIN_S, s))
@@ -46,6 +50,24 @@ export function FakeMap({ meetings, friends, onOpen }: { meetings: Meeting[]; fr
   const byId = useMemo(() => new Map(friends.map((f) => [f.id, f])), [friends])
   const groups = useMemo(() => groupByPlace(meetings), [meetings])
   const clusters = useMemo(() => clusterGroups(groups, 34 / view.s), [groups, view.s])
+  const previews = useMemo(() => {
+    const candidates = clusters
+      .filter((c) => c.groups.length === 1)
+      .flatMap((c) => {
+        const shot = [...c.groups[0].meetings].sort((a, b) => b.date.localeCompare(a.date)).find((m) => m.photos?.length)
+        return shot ? [{ c, shot }] : []
+      })
+      .sort((a, b) => b.shot.date.localeCompare(a.shot.date))
+    const picked = new Map<string, Meeting>()
+    const taken: Point[] = []
+    for (const { c, shot } of candidates) {
+      if (picked.size >= MAX_PREVIEWS) break
+      if (taken.some((p) => Math.abs(p.x - c.x) * view.s < PREVIEW_W && Math.abs(p.y - c.y) * view.s < PREVIEW_H)) continue
+      taken.push(c)
+      picked.set(c.key, shot)
+    }
+    return picked
+  }, [clusters, view.s])
   const signature = groups.map((g) => g.key).join('|')
   const selectedGroup = groups.find((g) => g.key === selected)
 
@@ -245,6 +267,8 @@ export function FakeMap({ meetings, friends, onOpen }: { meetings: Meeting[]; fr
         const latest = [...g.meetings].sort((a, b) => b.date.localeCompare(a.date))[0]
         const meta = ACTIVITY_META[latest.activity]
         const isSel = selected === g.key
+        const preview = previews.get(c.key)
+        const faces = preview ? preview.friendIds.map((id) => byId.get(id)).filter((f): f is Friend => !!f) : []
         return (
           <button
             key={c.key}
@@ -256,8 +280,22 @@ export function FakeMap({ meetings, friends, onOpen }: { meetings: Meeting[]; fr
             }}
             aria-label={`${g.label}, ${g.meetings.length} moment${g.meetings.length > 1 ? 's' : ''}`}
             className="fakemap-pin absolute -translate-x-1/2 -translate-y-full transition hover:scale-110"
-            style={{ ...pos, zIndex: isSel ? 10 : 1 }}
+            style={{ ...pos, zIndex: isSel ? 10 : preview ? 2 : 1 }}
           >
+            {preview && (
+              <span className="absolute bottom-full left-1/2 mb-2.5 -translate-x-1/2">
+                <span className="map-preview relative block" style={{ rotate: `${(preview.id.charCodeAt(preview.id.length - 1) % 3) * 4 - 4}deg` }}>
+                  <span className="block h-14 w-16 overflow-hidden rounded-xl bg-night shadow-xl shadow-black/70 ring-2 ring-white/90">
+                    <img src={preview.photos![0]} alt="" loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
+                  </span>
+                  <span className="absolute -bottom-2.5 left-1/2 flex -translate-x-1/2 -space-x-1.5">
+                    {faces.slice(0, 3).map((f) => (
+                      <Avatar key={f.id} friend={f} size="xs" className="ring-2 ring-night" />
+                    ))}
+                  </span>
+                </span>
+              </span>
+            )}
             <span
               className={`flex h-10 w-10 items-center justify-center rounded-full rounded-br-none bg-night text-lg transition ${isSel ? 'scale-125' : ''}`}
               style={{ rotate: '45deg', boxShadow: `0 0 0 2.5px ${meta.color}, 0 0 26px -2px ${meta.color}` }}

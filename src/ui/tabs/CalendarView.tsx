@@ -3,7 +3,7 @@ import { CalendarPlus, ChevronLeft, ChevronRight, MapPin } from 'lucide-react'
 import { meetingsByDay, monthGrid } from '../../domain/calendar'
 import { parseDay, todayIso } from '../../domain/dates'
 import { ACTIVITY_META, type Friend, type Meeting } from '../../domain/types'
-import { AvatarStack, glass } from '../components'
+import { Avatar, AvatarStack, glass } from '../components'
 
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
@@ -82,6 +82,8 @@ export function CalendarView({
             const list = byDay.get(day) ?? []
             const outside = !day.startsWith(monthKey)
             const main = list[0] && ACTIVITY_META[list[0].activity]
+            const shot = list.find((m) => m.photos?.length)
+            const faces = shot ? shot.friendIds.map((id) => byId.get(id)).filter((f): f is Friend => !!f) : []
             const isToday = day === today
             const isSel = day === selected
             return (
@@ -99,8 +101,20 @@ export function CalendarView({
                   ...(main && { background: `linear-gradient(160deg, ${main.color}55, ${main.color}18)`, boxShadow: isSel ? undefined : `inset 0 0 0 1px ${main.color}55` }),
                 }}
               >
-                <span className={`self-start pl-1 text-sm font-bold leading-tight md:text-base ${isToday ? 'text-fuchsia-300' : ''}`}>{parseDay(day).getDate()}</span>
-                {list.length > 0 && (
+                {shot && (
+                  <>
+                    <img src={shot.photos![0]} alt="" loading="lazy" decoding="async" draggable={false} className="calendar-photo absolute inset-0 h-full w-full object-cover" />
+                    <span className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/10 to-black/60" />
+                  </>
+                )}
+                <span className={`relative self-start pl-1 text-sm font-bold leading-tight drop-shadow md:text-base ${isToday ? 'text-fuchsia-300' : ''}`}>{parseDay(day).getDate()}</span>
+                {shot ? (
+                  <span className="relative flex -space-x-1.5 self-end">
+                    {faces.slice(0, 3).map((f) => (
+                      <Avatar key={f.id} friend={f} size="xs" className="ring-[1.5px] ring-black/70" />
+                    ))}
+                  </span>
+                ) : list.length > 0 && (
                   <span className="flex items-center gap-0.5 text-[13px] leading-none md:text-base">
                     {list.slice(0, 3).map((m) => (
                       <span key={m.id}>{ACTIVITY_META[m.activity].emoji}</span>
@@ -128,9 +142,13 @@ export function CalendarView({
             return (
               <li key={m.id} className="animate-rise" style={{ animationDelay: `${i * 60}ms` }}>
                 <button type="button" onClick={() => onOpen(m)} className="flex w-full items-center gap-3 rounded-2xl bg-white/[0.04] p-3 text-left ring-1 ring-white/10 hover:bg-white/[0.08]">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl" style={{ background: `${meta.color}26`, boxShadow: `inset 0 0 0 1px ${meta.color}66` }}>
-                    {meta.emoji}
-                  </span>
+                  {m.photos?.length ? (
+                    <img src={m.photos[0]} alt="" loading="lazy" decoding="async" className="h-10 w-10 shrink-0 rounded-xl object-cover ring-1 ring-white/20" />
+                  ) : (
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl" style={{ background: `${meta.color}26`, boxShadow: `inset 0 0 0 1px ${meta.color}66` }}>
+                      {meta.emoji}
+                    </span>
+                  )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{ppl.map((f) => f.name).join(', ')}</span>
                     <span className="flex items-center gap-1 truncate text-xs text-white/50">
