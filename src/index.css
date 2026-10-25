@@ -169,6 +169,7 @@ body {
   transform: perspective(900px) rotateY(calc(var(--p, 0) * -24deg)) translateY(calc(var(--ap, 0) * var(--lift)))
     scale(calc(1 - var(--ap, 0) * 0.12)) skewX(calc(var(--v, 0) * -7deg));
   opacity: calc(1 - var(--ap, 0) * 0.4);
+  will-change: transform, opacity;
 }
 .frise-entry[data-up] .frise-tilt {
   --lift: -16px;
@@ -178,7 +179,7 @@ body {
   scale: calc(1 - var(--ap, 0) * 0.3);
 }
 .frise-glow {
-  stroke-width: calc(14px + var(--av, 0) * 16px);
+  stroke-width: calc(18px + var(--av, 0) * 20px);
   transition: stroke-width 0.3s ease-out;
 }
 .frise-year {
@@ -199,6 +200,23 @@ body {
 .frise-mini-window {
   box-shadow: 0 0 24px -4px #c026d3aa;
   transition: box-shadow 0.2s;
+}
+
+.frise-cover img:first-child {
+  transition: transform 1.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.frise-entry[data-active] .frise-cover img:first-child,
+.frise-cover:hover img:first-child {
+  transform: scale(1.08);
+}
+.photo-in {
+  animation: photo-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@keyframes photo-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--photo-from, 0)) scale(0.96);
+  }
 }
 
 /* Calendar */

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { CalendarDays, ChartColumn, Clock3, Map as MapIcon, Plus, Search, Settings2, SlidersHorizontal, Users, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { filterMeetings } from '../domain/filters'
@@ -133,8 +133,8 @@ export function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const visible = filterMeetings(meetings, friends, filters)
 
-  const open = (meeting: Meeting) => setEditing({ meeting })
-  const add = () => setEditing({})
+  const open = useCallback((meeting: Meeting) => setEditing({ meeting }), [])
+  const add = useCallback(() => setEditing({}), [])
   const home = () => setView('frise')
 
   function showFriend(friendId: string) {

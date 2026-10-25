@@ -180,4 +180,12 @@ describe('buildDemoData volume', () => {
     expect(new Set(a.meetings.map((m) => m.id)).size).toBe(a.meetings.length)
     expect(a.meetings.map((m) => m.date)).toEqual(b.meetings.map((m) => m.date))
   })
+
+  it('attaches deterministic souvenir photos to some meetings', () => {
+    const a = buildDemoData(now).meetings
+    const withPhotos = a.filter((m) => m.photos?.length)
+    expect(withPhotos.length).toBeGreaterThan(a.length / 3)
+    expect(withPhotos.length).toBeLessThan(a.length)
+    expect(buildDemoData(now).meetings.map((m) => m.photos)).toEqual(a.map((m) => m.photos))
+  })
 })

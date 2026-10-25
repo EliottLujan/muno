@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { filterMeetings } from '../../domain/filters'
 import type { Meeting } from '../../domain/types'
 import { actions, useStore } from '../../store/store'
@@ -5,7 +6,7 @@ import { Frise } from './Frise'
 
 export function Timeline({ onOpen, onAdd }: { onOpen: (m: Meeting) => void; onAdd: () => void }) {
   const { meetings, friends, filters } = useStore()
-  const visible = filterMeetings(meetings, friends, filters)
+  const visible = useMemo(() => filterMeetings(meetings, friends, filters), [meetings, friends, filters])
 
   if (meetings.length === 0) {
     return (

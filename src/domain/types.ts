@@ -24,6 +24,8 @@ export type Meeting = {
   place: Place
   activity: Activity
   note?: string
+  /** Image URLs, cover first. */
+  photos?: string[]
 }
 
 export type Period = '30d' | '3m' | '1y' | 'all'

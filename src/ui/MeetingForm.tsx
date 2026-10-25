@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { CalendarDays, LoaderCircle, LocateFixed, MapPin, Search, Trash2 } from 'lucide-react'
+import { CalendarDays, LoaderCircle, LocateFixed, MapPin, Search, Trash2, X } from 'lucide-react'
 import { todayIso } from '../domain/dates'
 import { ACTIVITIES, ACTIVITY_META, type Activity, type Meeting, type Place } from '../domain/types'
 import { currentPosition, reverseGeocode, searchPlaces } from '../services/geocoding'
 import { actions, useStore } from '../store/store'
 import { Avatar, FriendChip, Modal } from './components'
+import { PhotoViewer } from './PhotoViewer'
 
 const field = 'w-full rounded-2xl bg-white/[0.05] px-4 py-3 ring-1 ring-white/10 placeholder:text-white/30 focus:outline-none focus:ring-white/30'
 
@@ -30,6 +31,8 @@ export function MeetingForm({ meeting, initialDate, onClose }: { meeting?: Meeti
   const [locating, setLocating] = useState(false)
   const [activity, setActivity] = useState<Activity>(meeting?.activity ?? 'resto')
   const [note, setNote] = useState(meeting?.note ?? '')
+  const [photos, setPhotos] = useState(meeting?.photos ?? [])
+  const [viewing, setViewing] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -92,7 +95,7 @@ export function MeetingForm({ meeting, initialDate, onClose }: { meeting?: Meeti
     e.preventDefault()
     if (friendIds.length === 0) return setError('Avec qui ? Ajoute au moins une personne.')
     if (!place) return setError('Où ça ? Choisis un lieu.')
-    actions.saveMeeting({ id: meeting?.id, date, friendIds, place, activity, note: note.trim() || undefined })
+    actions.saveMeeting({ id: meeting?.id, date, friendIds, place, activity, note: note.trim() || undefined, photos: photos.length ? photos : undefined })
     onClose()
   }
 
@@ -245,6 +248,31 @@ export function MeetingForm({ meeting, initialDate, onClose }: { meeting?: Meeti
         <Section label="Un souvenir">
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Ce qu'il s'est passé…" className={field} />
         </Section>
+
+        {photos.length > 0 && (
+          <Section label={`Souvenirs · ${photos.length}`}>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {photos.map((src, i) => (
+                <div key={src} className="group relative aspect-[4/3] overflow-hidden rounded-2xl ring-1 ring-white/10">
+                  <button type="button" onClick={() => setViewing(i)} aria-label={`Voir la photo ${i + 1}`} className="h-full w-full">
+                    <img src={src} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition duration-500 group-hover:scale-110" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPhotos((list) => list.filter((p) => p !== src))}
+                    aria-label={`Retirer la photo ${i + 1}`}
+                    className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white/80 hover:bg-black/80 hover:text-white"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+        {viewing !== null && photos.length > 0 && (
+          <PhotoViewer photos={photos} start={Math.min(viewing, photos.length - 1)} caption={place?.label} onClose={() => setViewing(null)} />
+        )}
 
         {error && <p className="animate-fade rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-400/30">{error}</p>}
 

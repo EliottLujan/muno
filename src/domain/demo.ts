@@ -154,6 +154,15 @@ const MEETINGS: [number, number[], number, string?][] = [
   [520, [0, 5, 9], 8],
 ]
 
+// Placeholder souvenirs: seeded picsum shots, stable per meeting. Trips get more of them.
+function demoPhotos(i: number, activity: Activity): string[] | undefined {
+  const r = mulberry32(1000 + i)
+  const chance = activity === 'voyage' ? 0.95 : activity === 'soiree' || activity === 'sport' ? 0.7 : 0.5
+  if (r() > chance) return undefined
+  const count = activity === 'voyage' ? 2 + Math.floor(r() * 4) : 1 + Math.floor(r() * 3)
+  return Array.from({ length: count }, (_, k) => `https://picsum.photos/seed/muno-${i}-${k}/640/480`)
+}
+
 export function buildDemoData(now = new Date()): { friends: Friend[]; meetings: Meeting[] } {
   const friends = DEMO_FRIENDS.map(([name, portrait], i) => ({
     id: `demo-friend-${i}`,
@@ -169,6 +178,7 @@ export function buildDemoData(now = new Date()): { friends: Friend[]; meetings: 
       place,
       activity,
       note,
+      photos: demoPhotos(i, activity),
     }
   })
   return { friends, meetings }
