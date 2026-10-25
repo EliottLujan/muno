@@ -187,6 +187,11 @@ body {
   letter-spacing: -0.04em;
   transform: translateX(calc((var(--sx, 0) + var(--cw, 0) / 2 - var(--x, 0)) * 0.35px));
 }
+.frise-future {
+  background: repeating-linear-gradient(90deg, #f97316 0 6px, transparent 6px 14px);
+  mask-image: linear-gradient(90deg, #000, transparent);
+  opacity: 0.6;
+}
 .frise-ticker {
   animation: frise-ticker 0.45s cubic-bezier(0.2, 1.2, 0.3, 1) both;
 }
@@ -196,10 +201,6 @@ body {
     transform: translateY(70%);
     filter: blur(4px);
   }
-}
-.frise-mini-window {
-  box-shadow: 0 0 24px -4px #c026d3aa;
-  transition: box-shadow 0.2s;
 }
 
 .frise-cover img:first-child {

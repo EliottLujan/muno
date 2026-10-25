@@ -1,5 +1,5 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { ChevronLeft, ChevronRight, Images, MapPin } from 'lucide-react'
+import { Images, MapPin } from 'lucide-react'
 import { daysBetween, formatDay, parseDay, relativeDays } from '../../domain/dates'
 import { layoutFrise, type FriseNode } from '../../domain/frise'
 import { ACTIVITY_META, type Friend, type Meeting } from '../../domain/types'
@@ -20,6 +20,9 @@ const STEP = 240
 const MONTH_GAP = 120
 /** Rendering window granularity (frise px): the DOM only changes when crossing a chunk. */
 const CHUNK = 900
+/** Share of the viewport left free to the right of the "Maintenant" chip when scrolled to the end. */
+const NOW_SPACE = 0.2
+const NOW_INSET = 72
 
 const nodeY = (n: FriseNode, i: number) => MID + (n.up ? -1 : 1) * AMPS[i % AMPS.length]
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
@@ -117,7 +120,6 @@ function MonthTicker({ register }: { register: (set: (key: string) => void) => v
 export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; friends: Friend[]; onOpen: (m: Meeting) => void }) {
   const scroller = useRef<HTMLDivElement>(null)
   const inner = useRef<HTMLDivElement>(null)
-  const miniWindow = useRef<HTMLDivElement>(null)
   const entries = useRef<(HTMLDivElement | null)[]>([])
   const observer = useRef<IntersectionObserver | null>(null)
   const refresh = useRef<() => void>(() => {})
@@ -127,6 +129,8 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
   const hinted = useRef(false)
   const [zoom, setZoom] = useState(1)
   const zoomRef = useRef(1)
+  const [tail, setTail] = useState(0)
+  const tailRef = useRef(0)
   const keep = useRef<{ ratio: number; atEnd: boolean } | null>(null)
   const drag = useRef<{ x: number; left: number; moved: boolean; lastX: number; lastT: number; v: number } | null>(null)
   const [viewer, setViewer] = useState<Meeting | null>(null)
@@ -214,11 +218,14 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
     if (!el) return
     const measure = () => {
       const next = Math.round(clamp(el.clientHeight / H, 0.5, 1.35) * 100) / 100
-      if (next === zoomRef.current) return
+      const nextTail = Math.max(0, Math.round((el.clientWidth / next) * NOW_SPACE - NOW_INSET))
+      if (next === zoomRef.current && nextTail === tailRef.current) return
       const max = el.scrollWidth - el.clientWidth
       keep.current = { ratio: (el.scrollLeft + el.clientWidth / 2) / Math.max(1, el.scrollWidth), atEnd: el.scrollLeft >= max - 2 }
       zoomRef.current = next
+      tailRef.current = nextTail
       setZoom(next)
+      setTail(nextTail)
     }
     measure()
     const ro = new ResizeObserver(measure)
@@ -233,7 +240,7 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
     keep.current = null
     stopEngine()
     el.scrollLeft = k.atEnd ? el.scrollWidth : k.ratio * el.scrollWidth - el.clientWidth / 2
-  }, [zoom])
+  }, [zoom, tail])
 
   useLayoutEffect(() => {
     const el = scroller.current
@@ -299,11 +306,6 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
       const nextMonth = best >= 0 ? layout.nodes[best].meeting.date.slice(0, 7) : ''
       if (nextMonth !== month) setMonth.current((month = nextMonth))
 
-      const mini = miniWindow.current
-      if (mini && el.scrollWidth > 0) {
-        mini.style.left = `${(left / el.scrollWidth) * 100}%`
-        mini.style.width = `${(el.clientWidth / el.scrollWidth) * 100}%`
-      }
     }
 
     const fx = { raf: 0, last: el.scrollLeft, lastT: 0, v: 0, idle: 0 }
@@ -365,39 +367,7 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
   // Entries mounted by a window change need their scroll-driven vars right away.
   useLayoutEffect(() => refresh.current(), [first, last])
 
-  const page = (dir: -1 | 1) => {
-    interacted.current = true
-    const el = scroller.current
-    if (el) scrollTo(base() + dir * el.clientWidth * 0.8)
-  }
-
-  const fromMini = (clientX: number, instant: boolean) => {
-    const el = scroller.current
-    const bar = miniWindow.current?.parentElement
-    if (!el || !bar) return
-    const r = bar.getBoundingClientRect()
-    scrollTo(((clientX - r.left) / r.width) * el.scrollWidth - el.clientWidth / 2, instant)
-  }
-
-  const miniDots = useMemo(
-    () => (
-      <>
-        {layout.nodes.map((n, i) => (
-          <span
-            key={n.meeting.id}
-            className="absolute h-1.5 w-1.5 -translate-x-1/2 rounded-full"
-            style={{ left: `${(n.x / layout.width) * 100}%`, top: `calc(50% ${n.up ? '-' : '+'} ${AMPS[i % AMPS.length] / 8}px - 3px)`, background: ACTIVITY_META[n.meeting.activity].color }}
-          />
-        ))}
-        {years.map((n) => (
-          <span key={n.meeting.id} className="absolute bottom-0 -translate-x-1/2 text-[9px] font-bold text-white/35" style={{ left: `${(n.x / layout.width) * 100}%` }}>
-            {n.meeting.date.slice(0, 4)}
-          </span>
-        ))}
-      </>
-    ),
-    [layout, years],
-  )
+  const total = layout.width + tail
 
   const registerMonth = useCallback((set: (key: string) => void) => {
     setMonth.current = set
@@ -408,7 +378,6 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
   const inWin = (x: number) => x >= from - 200 && x <= to + 200
   const cometDur = Math.max(6, svgW / 260)
   const now = new Date()
-  const roundBtn = `flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/70 transition hover:scale-110 hover:text-white active:scale-95 ${glass}`
 
   return (
     <div className="flex h-full flex-col">
@@ -459,7 +428,7 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
           }
         }}
       >
-        <div key={signature} ref={inner} className="relative shrink-0 select-none" style={{ width: layout.width, height: H, zoom }}>
+        <div key={signature} ref={inner} className="relative shrink-0 select-none" style={{ width: total, height: H, zoom }}>
           {years.filter((n) => inWin(n.x)).map((n) => (
             <span
               key={n.meeting.id}
@@ -542,7 +511,7 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
           {from < 400 && (
             <div
               className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-fuchsia-600/50 to-violet-600/50 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-white/85 ring-1 ring-white/15"
-              style={{ left: 72, top: MID }}
+              style={{ left: NOW_INSET, top: MID }}
             >
               ✨ Le début
             </div>
@@ -550,7 +519,7 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
           {to >= layout.width - 400 && (
             <div
               className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full bg-gradient-to-r from-violet-600/60 to-orange-500/60 px-3 py-1 text-[11px] font-bold uppercase tracking-widest ring-1 ring-white/20"
-              style={{ left: layout.width - 72, top: MID }}
+              style={{ left: layout.width - NOW_INSET, top: MID }}
             >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inset-0 animate-ping rounded-full bg-orange-300" />
@@ -558,6 +527,14 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
               </span>
               Maintenant
             </div>
+          )}
+
+          {tail > 0 && to >= layout.width - 400 && (
+            <span
+              aria-hidden
+              className="frise-future pointer-events-none absolute h-0.5"
+              style={{ left: layout.width, width: tail, top: MID - 1 }}
+            />
           )}
 
           {shown.map((n, k) => {
@@ -604,27 +581,7 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
         </div>
       </div>
 
-      <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-3">
-        <button type="button" aria-label="Plus ancien" onClick={() => page(-1)} className={roundBtn}>
-          <ChevronLeft size={18} />
-        </button>
-        <div
-          className="relative h-10 min-w-0 flex-1 cursor-pointer touch-none"
-          role="presentation"
-          onPointerDown={(e) => {
-            interacted.current = true
-            e.currentTarget.setPointerCapture(e.pointerId)
-            fromMini(e.clientX, false)
-          }}
-          onPointerMove={(e) => e.currentTarget.hasPointerCapture(e.pointerId) && fromMini(e.clientX, true)}
-        >
-          <span className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-fuchsia-500/30 via-white/15 to-orange-400/30" />
-          {miniDots}
-          <div ref={miniWindow} className="frise-mini-window absolute inset-y-0 rounded-xl bg-white/[0.07] ring-1 ring-white/40" />
-        </div>
-        <button type="button" aria-label="Plus récent" onClick={() => page(1)} className={roundBtn}>
-          <ChevronRight size={18} />
-        </button>
+      <div className="flex justify-center px-3">
         <button
           type="button"
           aria-label="Revenir à maintenant"
@@ -638,7 +595,7 @@ export function Frise({ meetings, friends, onOpen }: { meetings: Meeting[]; frie
             <span className="absolute inset-0 animate-ping rounded-full bg-fuchsia-400" />
             <span className="relative h-2 w-2 rounded-full bg-fuchsia-400" />
           </span>
-          <span className="hidden sm:inline">Maintenant</span>
+          <span>Maintenant</span>
         </button>
       </div>
 
