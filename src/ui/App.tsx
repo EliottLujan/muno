@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChartColumn, Clock3, Map as MapIcon, Plus, Settings2, Users } from 'lucide-react'
+import { ChartColumn, Clock3, Compass, Plus, Settings2, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Activity as ActivityType, Meeting } from '../domain/types'
 import { actions } from '../store/store'
@@ -8,14 +8,14 @@ import { MeetingForm } from './MeetingForm'
 import { Settings } from './Settings'
 import { Activity } from './tabs/Activity'
 import { Friends } from './tabs/Friends'
-import { MapView } from './tabs/MapView'
+import { Explore } from './tabs/Explore'
 import { Timeline } from './tabs/Timeline'
 
-type Tab = 'timeline' | 'map' | 'friends' | 'activity'
+type Tab = 'timeline' | 'explore' | 'friends' | 'activity'
 
 const TABS: { id: Tab; label: string; Icon: LucideIcon }[] = [
   { id: 'timeline', label: 'Timeline', Icon: Clock3 },
-  { id: 'map', label: 'Carte', Icon: MapIcon },
+  { id: 'explore', label: 'Explorer', Icon: Compass },
   { id: 'friends', label: 'Amis', Icon: Users },
   { id: 'activity', label: 'Activité', Icon: ChartColumn },
 ]
@@ -49,11 +49,12 @@ function TabButton({ tab, active, onClick }: { tab: (typeof TABS)[number]; activ
 
 export function App() {
   const [tab, setTab] = useState<Tab>('timeline')
-  const [editing, setEditing] = useState<{ meeting?: Meeting } | null>(null)
+  const [editing, setEditing] = useState<{ meeting?: Meeting; date?: string } | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const open = (meeting: Meeting) => setEditing({ meeting })
   const add = () => setEditing({})
+  const addOn = (date: string) => setEditing({ date })
 
   function go(next: Tab) {
     setTab(next)
@@ -104,20 +105,18 @@ export function App() {
       </aside>
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
-        {tab !== 'map' && (
-          <header className="flex items-center justify-between px-4 pb-1 pt-[calc(env(safe-area-inset-top)+12px)] md:hidden">
-            <Logo />
-            {settingsButton}
-          </header>
-        )}
+        <header className="flex items-center justify-between px-4 pb-1 pt-[calc(env(safe-area-inset-top)+12px)] md:hidden">
+          <Logo />
+          {settingsButton}
+        </header>
 
         <main
           id="main"
-          className={`flex-1 overflow-y-auto ${tab === 'map' ? 'md:p-6' : 'px-4 pb-32 pt-2 md:px-10 md:pb-12 md:pt-8'}`}
+          className="flex-1 overflow-y-auto px-4 pb-32 pt-2 md:px-10 md:pb-12 md:pt-8"
         >
-          <div className={tab === 'map' ? 'h-full' : 'mx-auto w-full max-w-2xl'}>
+          <div className={`mx-auto w-full ${tab === 'friends' || tab === 'activity' ? 'max-w-2xl' : 'max-w-5xl'}`}>
             {tab === 'timeline' && <Timeline onOpen={open} onAdd={add} />}
-            {tab === 'map' && <MapView onOpen={open} />}
+            {tab === 'explore' && <Explore onOpen={open} onAddOn={addOn} />}
             {tab === 'friends' && <Friends onShowFriend={showFriend} />}
             {tab === 'activity' && <Activity onShowActivity={showActivity} onShowFriend={showFriend} />}
           </div>
@@ -143,7 +142,7 @@ export function App() {
         ))}
       </nav>
 
-      {editing && <MeetingForm meeting={editing.meeting} onClose={() => setEditing(null)} />}
+      {editing && <MeetingForm meeting={editing.meeting} initialDate={editing.date} onClose={() => setEditing(null)} />}
       {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
     </div>
   )

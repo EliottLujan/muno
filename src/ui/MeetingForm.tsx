@@ -17,9 +17,9 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-export function MeetingForm({ meeting, onClose }: { meeting?: Meeting; onClose: () => void }) {
+export function MeetingForm({ meeting, initialDate, onClose }: { meeting?: Meeting; initialDate?: string; onClose: () => void }) {
   const { friends } = useStore()
-  const [date, setDate] = useState(meeting?.date ?? todayIso())
+  const [date, setDate] = useState(meeting?.date ?? initialDate ?? todayIso())
   const [friendIds, setFriendIds] = useState<string[]>(meeting?.friendIds ?? [])
   const [friendQuery, setFriendQuery] = useState('')
   const [place, setPlace] = useState<Place | null>(meeting?.place ?? null)

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { buildDemoData } from './demo'
 import { filterMeetings, groupByMonth } from './filters'
 import { relativeDays } from './dates'
+import { meetingsByDay, monthGrid } from './calendar'
+import { layoutFrise } from './frise'
+import { clusterGroups, groupByPlace, project } from './geo'
 import { buildHeatmap, countByActivity, friendStats, longestNotSeen, summarize } from './stats'
 import { EMPTY_FILTERS, type Friend, type Meeting } from './types'
 
@@ -120,5 +123,51 @@ describe('stats', () => {
     const later = new Date('2026-12-01T12:00:00')
     const extra: Meeting[] = [...meetings, { id: '5', date: '2026-11-30', friendIds: ['tom'], place: place('X'), activity: 'autre' }]
     expect(longestNotSeen(friendStats(friends, extra, later)).map((s) => s.friend.id)).toEqual(['lea', 'tom'])
+  })
+})
+
+describe('monthGrid', () => {
+  it('starts on monday and covers the month', () => {
+    const grid = monthGrid(2026, 9) // octobre 2026, 1er = jeudi
+    expect(grid[0][0]).toBe('2026-09-28')
+    expect(grid[0][3]).toBe('2026-10-01')
+    expect(grid.flat()).toContain('2026-10-31')
+    expect(grid.every((w) => w.length === 7)).toBe(true)
+  })
+
+  it('indexes meetings by day', () => {
+    const byDay = meetingsByDay([...meetings, { ...meetings[0], id: '5' }])
+    expect(byDay.get('2026-10-24')?.map((m) => m.id)).toEqual(['1', '5'])
+  })
+})
+
+describe('geo', () => {
+  it('groups same place and clusters close ones', () => {
+    const groups = groupByPlace(meetings)
+    expect(groups).toHaveLength(1)
+    expect(groups[0].meetings).toHaveLength(4)
+    const far = groupByPlace([...meetings, { ...meetings[0], id: 'm', place: { label: 'Marseille', lat: 43.3, lng: 5.37 } }])
+    expect(clusterGroups(far, 50)).toHaveLength(2)
+    expect(clusterGroups(far, 1000)).toHaveLength(1)
+    expect(clusterGroups(far, 1000)[0].count).toBe(5)
+  })
+
+  it('projects north up and east right', () => {
+    const paris = project(48.85, 2.35)
+    const marseille = project(43.3, 5.37)
+    expect(marseille.y).toBeGreaterThan(paris.y)
+    expect(marseille.x).toBeGreaterThan(paris.x)
+  })
+})
+
+describe('layoutFrise', () => {
+  it('orders oldest to newest and alternates sides', () => {
+    const { nodes, months, width } = layoutFrise(meetings, { step: 100, monthGap: 50, pad: 10 })
+    expect(nodes.map((n) => n.meeting.id)).toEqual(['3', '2', '4', '1'])
+    expect(nodes.map((n) => n.up)).toEqual([true, false, true, false])
+    expect(months.map((m) => m.key)).toEqual(['2025-01', '2026-09', '2026-10'])
+    expect(nodes[3].x - nodes[2].x).toBe(100)
+    expect(nodes[1].x - nodes[0].x).toBe(150)
+    expect(width).toBe(nodes[3].x + 10)
   })
 })
